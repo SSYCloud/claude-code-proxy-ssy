@@ -1,6 +1,6 @@
 """
-Single-file FastAPI application to proxy Anthropic API requests to an OpenAI-compatible API (e.g., OpenRouter).
-Handles request/response conversion, streaming, and dynamic model selection.
+单文件FastAPI应用程序，用于将Anthropic API请求代理到OpenAI兼容的API（例如OpenRouter）。
+处理请求/响应转换、流式传输和动态模型选择。
 """
 
 import dataclasses
@@ -37,14 +37,16 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """从环境变量加载的应用程序设置。"""
 
     model_config = SettingsConfigDict(env_file="../../.env", extra="ignore")
 
     openai_api_key: str
     big_model_name: str
     small_model_name: str
-    base_url: str = "https://openrouter.ai/api/v1"
+    #base_url: str = "https://openrouter.ai/api/v1"
+    base_url: str = "https://router.shengsuanyun.com/api/v1"
+
     referrer_url: str = "http://localhost:8080/claude_proxy"
 
     app_name: str = "AnthropicProxy"
@@ -64,6 +66,7 @@ _error_console = Console(stderr=True, style="bold red")
 
 
 class JSONFormatter(logging.Formatter):
+    """JSON格式的日志格式化器。"""
     def format(self, record: logging.LogRecord) -> str:
         header = {
             "timestamp": datetime.fromtimestamp(
@@ -91,6 +94,7 @@ class JSONFormatter(logging.Formatter):
 
 
 class ConsoleJSONFormatter(JSONFormatter):
+    """控制台JSON格式的日志格式化器。"""
     def format(self, record: logging.LogRecord) -> str:
         log_dict = json.loads(super().format(record))
         if (
@@ -192,6 +196,7 @@ class LogRecord:
 
 
 _logger = logging.getLogger(settings.app_name)
+_request_logger = logging.getLogger(f"{settings.app_name}.requests")
 
 if settings.log_file_path:
     try:
@@ -208,6 +213,7 @@ if settings.log_file_path:
 
 
 def _log(level: int, record: LogRecord, exc: Optional[Exception] = None) -> None:
+    """记录日志的内部函数。"""
     if exc:
         record.error = LogError(
             name=type(exc).__name__,
@@ -226,30 +232,41 @@ def _log(level: int, record: LogRecord, exc: Optional[Exception] = None) -> None
 
 
 def debug(record: LogRecord):
+    """记录调试级别的日志。"""
     _log(logging.DEBUG, record)
 
 
 def info(record: LogRecord):
+    """记录信息级别的日志。"""
     _log(logging.INFO, record)
 
 
 def warning(record: LogRecord, exc: Optional[Exception] = None):
+    """记录警告级别的日志。"""
     _log(logging.WARNING, record, exc=exc)
 
 
 def error(record: LogRecord, exc: Optional[Exception] = None):
+    """记录错误级别的日志。"""
     if exc:
         _error_console.print_exception(show_locals=False, width=120)
     _log(logging.ERROR, record, exc=exc)
 
 
 def critical(record: LogRecord, exc: Optional[Exception] = None):
+    """记录严重错误级别的日志。"""
     _log(logging.CRITICAL, record, exc=exc)
+
+
+class CacheControl(BaseModel):
+    """缓存控制模型，用于提示词缓存功能。"""
+    type: Literal["ephemeral"]
 
 
 class ContentBlockText(BaseModel):
     type: Literal["text"]
     text: str
+    cache_control: Optional[CacheControl] = None
 
 
 class ContentBlockImageSource(BaseModel):
@@ -261,6 +278,7 @@ class ContentBlockImageSource(BaseModel):
 class ContentBlockImage(BaseModel):
     type: Literal["image"]
     source: ContentBlockImageSource
+    cache_control: Optional[CacheControl] = None
 
 
 class ContentBlockToolUse(BaseModel):
@@ -268,6 +286,7 @@ class ContentBlockToolUse(BaseModel):
     id: str
     name: str
     input: Dict[str, Any]
+    cache_control: Optional[CacheControl] = None
 
 
 class ContentBlockToolResult(BaseModel):
@@ -275,6 +294,7 @@ class ContentBlockToolResult(BaseModel):
     tool_use_id: str
     content: Union[str, List[Dict[str, Any]], List[Any]]
     is_error: Optional[bool] = None
+    cache_control: Optional[CacheControl] = None
 
 
 ContentBlock = Union[
@@ -285,6 +305,7 @@ ContentBlock = Union[
 class SystemContent(BaseModel):
     type: Literal["text"]
     text: str
+    cache_control: Optional[CacheControl] = None
 
 
 class Message(BaseModel):
@@ -296,6 +317,7 @@ class Tool(BaseModel):
     name: str
     description: Optional[str] = None
     input_schema: Dict[str, Any] = Field(..., alias="input_schema")
+    cache_control: Optional[CacheControl] = None
 
 
 class ToolChoice(BaseModel):
@@ -466,7 +488,7 @@ _token_encoder_cache: Dict[str, tiktoken.Encoding] = {}
 def get_token_encoder(
     model_name: str = "gpt-4", request_id: Optional[str] = None
 ) -> tiktoken.Encoding:
-    """Gets a tiktoken encoder, caching it for performance."""
+    """获取tiktoken编码器，并缓存以提高性能。"""
 
     cache_key = "gpt-4"
     if cache_key not in _token_encoder_cache:
@@ -508,15 +530,21 @@ def count_tokens_for_anthropic_request(
     tools: Optional[List[Tool]] = None,
     request_id: Optional[str] = None,
 ) -> int:
+    """计算Anthropic请求的令牌数量，包括支持缓存控制。"""
     enc = get_token_encoder(model_name, request_id)
     total_tokens = 0
 
+    # Count system tokens
     if isinstance(system, str):
         total_tokens += len(enc.encode(system))
     elif isinstance(system, list):
         for block in system:
             if isinstance(block, SystemContent) and block.type == "text":
                 total_tokens += len(enc.encode(block.text))
+                # Add tokens for cache_control if present
+                if block.cache_control:
+                    # Approximate token count for cache_control structure
+                    total_tokens += 5
 
     for msg in messages:
         total_tokens += 4
@@ -529,10 +557,19 @@ def count_tokens_for_anthropic_request(
             for block in msg.content:
                 if isinstance(block, ContentBlockText):
                     total_tokens += len(enc.encode(block.text))
+                    # Add tokens for cache_control if present
+                    if block.cache_control:
+                        total_tokens += 5
                 elif isinstance(block, ContentBlockImage):
                     total_tokens += 768
+                    # Add tokens for cache_control if present
+                    if block.cache_control:
+                        total_tokens += 5
                 elif isinstance(block, ContentBlockToolUse):
                     total_tokens += len(enc.encode(block.name))
+                    # Add tokens for cache_control if present
+                    if block.cache_control:
+                        total_tokens += 5
                     try:
                         input_str = json.dumps(block.input)
                         total_tokens += len(enc.encode(input_str))
@@ -562,6 +599,9 @@ def count_tokens_for_anthropic_request(
                         else:
                             content_str = json.dumps(block.content)
                         total_tokens += len(enc.encode(content_str))
+                        # Add tokens for cache_control if present
+                        if block.cache_control:
+                            total_tokens += 5
                     except Exception:
                         warning(
                             LogRecord(
@@ -580,6 +620,9 @@ def count_tokens_for_anthropic_request(
             try:
                 schema_str = json.dumps(tool.input_schema)
                 total_tokens += len(enc.encode(schema_str))
+                # Add tokens for cache_control if present
+                if tool.cache_control:
+                    total_tokens += 5
             except Exception:
                 warning(
                     LogRecord(
@@ -611,8 +654,8 @@ def _serialize_tool_result_content_for_openai(
     log_context: Dict,
 ) -> str:
     """
-    Serializes Anthropic tool result content (which can be complex) into a single string
-    as expected by OpenAI for the 'content' field of a 'tool' role message.
+    将Anthropic工具结果内容（可能很复杂）序列化为单个字符串，
+    以满足OpenAI对'tool'角色消息的'content'字段的要求。
     """
     if isinstance(anthropic_tool_result_content, str):
         return anthropic_tool_result_content
@@ -666,32 +709,51 @@ def _serialize_tool_result_content_for_openai(
 
 def convert_anthropic_to_openai_messages(
     anthropic_messages: List[Message],
+    target_model_name: str,
     anthropic_system: Optional[Union[str, List[SystemContent]]] = None,
     request_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
+    """将Anthropic消息格式转换为OpenAI消息格式，支持缓存控制。"""
     openai_messages: List[Dict[str, Any]] = []
+    is_claude_model = "abcdef" in target_model_name.lower()
 
-    system_text_content = ""
-    if isinstance(anthropic_system, str):
-        system_text_content = anthropic_system
-    elif isinstance(anthropic_system, list):
-        system_texts = [
-            block.text
-            for block in anthropic_system
-            if isinstance(block, SystemContent) and block.type == "text"
-        ]
-        if len(system_texts) < len(anthropic_system):
-            warning(
-                LogRecord(
-                    event=LogEvent.SYSTEM_PROMPT_ADJUSTED.value,
-                    message="Non-text content blocks in Anthropic system prompt were ignored.",
-                    request_id=request_id,
-                )
-            )
-        system_text_content = "\n".join(system_texts)
+    if anthropic_system:
+        if isinstance(anthropic_system, str):
+            openai_messages.append({"role": "system", "content": anthropic_system})
+        elif isinstance(anthropic_system, list):
+            if is_claude_model:
+                # For Claude models, pass system content as a list of blocks
+                system_content_blocks = []
+                for block in anthropic_system:
+                    if isinstance(block, SystemContent):
+                        block_dict = block.model_dump(exclude_unset=True)
+                        if not block.cache_control:
+                            block_dict.pop("cache_control", None)
+                        system_content_blocks.append(block_dict)
+                if system_content_blocks:
+                    openai_messages.append(
+                        {"role": "system", "content": system_content_blocks}
+                    )
+            else:
+                # For other models, concatenate text blocks
+                system_texts = []
+                for block in anthropic_system:
+                    if isinstance(block, SystemContent) and block.type == "text":
+                        system_texts.append(block.text)
 
-    if system_text_content:
-        openai_messages.append({"role": "system", "content": system_text_content})
+                if len(system_texts) < len(anthropic_system):
+                    warning(
+                        LogRecord(
+                            event=LogEvent.SYSTEM_PROMPT_ADJUSTED.value,
+                            message="Non-text content blocks in Anthropic system prompt were ignored for non-Claude model.",
+                            request_id=request_id,
+                        )
+                    )
+                system_text_content = "\n".join(system_texts)
+                if system_text_content:
+                    openai_messages.append(
+                        {"role": "system", "content": system_text_content}
+                    )
 
     for i, msg in enumerate(anthropic_messages):
         role = msg.role
@@ -722,22 +784,24 @@ def convert_anthropic_to_openai_messages(
 
                 if isinstance(block, ContentBlockText):
                     if role == "user":
-                        openai_parts_for_user_message.append(
-                            {"type": "text", "text": block.text}
-                        )
+                        text_part = {"type": "text", "text": block.text}
+                        if is_claude_model and block.cache_control:
+                            text_part["cache_control"] = block.cache_control.model_dump()
+                        openai_parts_for_user_message.append(text_part)
                     elif role == "assistant":
                         text_content_for_assistant.append(block.text)
 
                 elif isinstance(block, ContentBlockImage) and role == "user":
                     if block.source.type == "base64":
-                        openai_parts_for_user_message.append(
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{block.source.media_type};base64,{block.source.data}"
-                                },
-                            }
-                        )
+                        image_part = {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{block.source.media_type};base64,{block.source.data}"
+                            },
+                        }
+                        if is_claude_model and block.cache_control:
+                            image_part["cache_control"] = block.cache_control.model_dump()
+                        openai_parts_for_user_message.append(image_part)
                     else:
                         warning(
                             LogRecord(
@@ -767,25 +831,29 @@ def convert_anthropic_to_openai_messages(
                         )
                         args_str = "{}"
 
-                    assistant_tool_calls.append(
-                        {
-                            "id": block.id,
-                            "type": "function",
-                            "function": {"name": block.name, "arguments": args_str},
-                        }
-                    )
+                    tool_call = {
+                        "id": block.id,
+                        "type": "function",
+                        "function": {"name": block.name, "arguments": args_str},
+                    }
+                    if is_claude_model and block.cache_control:
+                        tool_call["cache_control"] = block.cache_control.model_dump()
+                    assistant_tool_calls.append(tool_call)
 
                 elif isinstance(block, ContentBlockToolResult) and role == "user":
                     serialized_content = _serialize_tool_result_content_for_openai(
                         block.content, request_id, block_log_ctx
                     )
-                    openai_messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": block.tool_use_id,
-                            "content": serialized_content,
-                        }
-                    )
+                    tool_result_message = {
+                        "role": "tool",
+                        "tool_call_id": block.tool_use_id,
+                        "content": serialized_content,
+                    }
+                    if is_claude_model and block.cache_control:
+                        tool_result_message[
+                            "cache_control"
+                        ] = block.cache_control.model_dump()
+                    openai_messages.append(tool_result_message)
 
             if role == "user" and openai_parts_for_user_message:
                 is_multimodal = any(
@@ -868,12 +936,16 @@ def convert_anthropic_to_openai_messages(
 
 
 def convert_anthropic_tools_to_openai(
-    anthropic_tools: Optional[List[Tool]],
+    anthropic_tools: Optional[List[Tool]], target_model_name: str
 ) -> Optional[List[Dict[str, Any]]]:
+    """将Anthropic工具定义转换为OpenAI函数定义，支持缓存控制。"""
     if not anthropic_tools:
         return None
-    return [
-        {
+
+    is_claude_model = "claude" in target_model_name.lower()
+    openai_tools = []
+    for t in anthropic_tools:
+        tool_dict = {
             "type": "function",
             "function": {
                 "name": t.name,
@@ -881,14 +953,18 @@ def convert_anthropic_tools_to_openai(
                 "parameters": t.input_schema,
             },
         }
-        for t in anthropic_tools
-    ]
+        if is_claude_model and t.cache_control:
+            tool_dict["cache_control"] = t.cache_control.model_dump()
+        openai_tools.append(tool_dict)
+
+    return openai_tools
 
 
 def convert_anthropic_tool_choice_to_openai(
     anthropic_choice: Optional[ToolChoice],
     request_id: Optional[str] = None,
 ) -> Optional[Union[str, Dict[str, Any]]]:
+    """将Anthropic工具选择转换为OpenAI函数调用控制。"""
     if not anthropic_choice:
         return None
     if anthropic_choice.type == "auto":
@@ -922,6 +998,7 @@ def convert_openai_to_anthropic_response(
     original_anthropic_model_name: str,
     request_id: Optional[str] = None,
 ) -> MessagesResponse:
+    """将OpenAI响应转换为Anthropic响应格式。"""
     anthropic_content: List[ContentBlock] = []
     anthropic_stop_reason: StopReasonType = None
 
@@ -1025,7 +1102,7 @@ def convert_openai_to_anthropic_response(
 def _get_anthropic_error_details_from_exc(
     exc: Exception,
 ) -> Tuple[AnthropicErrorType, str, int, Optional[ProviderErrorMetadata]]:
-    """Maps caught exceptions to Anthropic error type, message, status code, and provider details."""
+    """将捕获的异常映射到Anthropic错误类型、消息、状态码和提供者详情。"""
     error_type = AnthropicErrorType.API_ERROR
     error_message = str(exc)
     status_code = 500
@@ -1061,7 +1138,7 @@ def _format_anthropic_error_sse_event(
     message: str,
     provider_details: Optional[ProviderErrorMetadata] = None,
 ) -> str:
-    """Formats an error into the Anthropic SSE 'error' event structure."""
+    """将错误格式化为Anthropic SSE 'error'事件结构。"""
     anthropic_err_detail = AnthropicErrorDetail(type=error_type, message=message)
     if provider_details:
         anthropic_err_detail.provider = provider_details.provider_name
@@ -1091,8 +1168,8 @@ async def handle_anthropic_streaming_response_from_openai_stream(
     start_time_mono: float,
 ) -> AsyncGenerator[str, None]:
     """
-    Consumes an OpenAI stream and yields Anthropic-compatible SSE events.
-    BUGFIX: Correctly handles content block indexing for mixed text/tool_use.
+    消费OpenAI流并生成Anthropic兼容的SSE事件。
+    修复：正确处理混合文本/工具使用的内容块索引。
     """
 
     anthropic_message_id = f"msg_stream_{request_id}_{uuid.uuid4().hex[:8]}"
@@ -1365,7 +1442,7 @@ app = fastapi.FastAPI(
 
 
 def select_target_model(client_model_name: str, request_id: str) -> str:
-    """Selects the target OpenRouter model based on the client's request."""
+    """根据客户端请求选择目标OpenRouter模型。"""
     client_model_lower = client_model_name.lower()
     target_model: str
 
@@ -1404,7 +1481,7 @@ def _build_anthropic_error_response(
     status_code: int,
     provider_details: Optional[ProviderErrorMetadata] = None,
 ) -> JSONResponse:
-    """Creates a JSONResponse with Anthropic-formatted error."""
+    """创建带有Anthropic格式错误的JSONResponse。"""
     err_detail = AnthropicErrorDetail(type=error_type, message=message)
     if provider_details:
         err_detail.provider = provider_details.provider_name
@@ -1467,8 +1544,9 @@ async def create_message_proxy(
     request: Request,
 ) -> Union[JSONResponse, StreamingResponse]:
     """
-    Main endpoint for Anthropic message completions, proxied to an OpenAI-compatible API.
-    Handles request/response conversions, streaming, and dynamic model selection.
+    Anthropic消息完成的主要端点，代理到OpenAI兼容的API。
+    处理请求/响应转换、流式传输和动态模型选择。
+    支持提示词缓存功能。
     """
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
@@ -1534,9 +1612,14 @@ async def create_message_proxy(
 
     try:
         openai_messages = convert_anthropic_to_openai_messages(
-            anthropic_request.messages, anthropic_request.system, request_id=request_id
+            anthropic_request.messages,
+            target_model_name,
+            anthropic_request.system,
+            request_id=request_id,
         )
-        openai_tools = convert_anthropic_tools_to_openai(anthropic_request.tools)
+        openai_tools = convert_anthropic_tools_to_openai(
+            anthropic_request.tools, target_model_name
+        )
         openai_tool_choice = convert_anthropic_tool_choice_to_openai(
             anthropic_request.tool_choice, request_id
         )
@@ -1578,6 +1661,26 @@ async def create_message_proxy(
             {"params": openai_params},
         )
     )
+
+    try:
+        log_entry = {
+            "request_id": request_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "anthropic_request": raw_body,
+            "openai_request": openai_params,
+        }
+        with open("conversion_log.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False, indent=2))
+            f.write("\n")
+    except Exception as e:
+        warning(
+            LogRecord(
+                event="conversion_log_failure",
+                message="Failed to write to conversion_log.jsonl",
+                request_id=request_id,
+            ),
+            exc=e,
+        )
 
     try:
         if is_stream:
@@ -1673,7 +1776,7 @@ async def create_message_proxy(
     "/v1/messages/count_tokens", response_model=TokenCountResponse, tags=["Utility"]
 )
 async def count_tokens_endpoint(request: Request) -> TokenCountResponse:
-    """Estimates token count for given Anthropic messages and system prompt."""
+    """估计给定Anthropic消息和系统提示的令牌数量，支持缓存控制。"""
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
     start_time_mono = time.monotonic()
@@ -1713,7 +1816,7 @@ async def count_tokens_endpoint(request: Request) -> TokenCountResponse:
 
 @app.get("/", include_in_schema=False, tags=["Health"])
 async def root_health_check() -> JSONResponse:
-    """Basic health check and information endpoint."""
+    """基本健康检查和信息端点。"""
     debug(
         LogRecord(
             event=LogEvent.HEALTH_CHECK.value, message="Root health check accessed"
