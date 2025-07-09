@@ -919,17 +919,18 @@ def convert_anthropic_to_openai_messages(
         if (
             msg_dict.get("role") == "assistant"
             and msg_dict.get("tool_calls")
-            and msg_dict.get("content") is not None
+            and "content" in msg_dict
+            and not msg_dict["content"]
         ):
             warning(
                 LogRecord(
                     event=LogEvent.MESSAGE_FORMAT_NORMALIZED.value,
-                    message="Corrected assistant message with tool_calls to have content: None.",
+                    message="Removing empty 'content' from assistant message with tool_calls.",
                     request_id=request_id,
                     data={"original_content": msg_dict["content"]},
                 )
             )
-            msg_dict["content"] = None
+            del msg_dict["content"]
         final_openai_messages.append(msg_dict)
 
     return final_openai_messages
