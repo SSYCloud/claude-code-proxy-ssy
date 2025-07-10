@@ -33,7 +33,7 @@ async def handle_anthropic_streaming_response_from_openai_stream(
 ) -> AsyncGenerator[str, None]:
     """
     消费OpenAI流并生成Anthropic兼容的SSE事件。
-    修复：正确处理混合文本/工具使用的内容块索引。
+    确保在多轮对话中保持消息顺序和缓存控制位置一致。
     
     Args:
         openai_stream: OpenAI流式响应
@@ -191,6 +191,7 @@ async def handle_anthropic_streaming_response_from_openai_stream(
                         and not tool_state["id"].startswith("tool_ph_")
                         and tool_state["name"]
                     ):
+                        # 保持工具块的顺序和结构一致
                         start_tool_event = {
                             "type": "content_block_start",
                             "index": current_anthropic_tool_block_idx,

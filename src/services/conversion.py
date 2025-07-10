@@ -134,6 +134,7 @@ def convert_anthropic_to_openai_messages(
 ) -> List[Dict[str, Any]]:
     """
     将Anthropic消息格式转换为OpenAI消息格式，支持缓存控制。
+    确保在多轮对话中保持消息顺序和缓存控制位置一致。
     
     Args:
         anthropic_messages: Anthropic格式的消息列表
@@ -284,10 +285,12 @@ def convert_anthropic_to_openai_messages(
                         "tool_call_id": block.tool_use_id,
                         "content": serialized_content,
                     }
+                    # 保持缓存控制位置一致
                     if is_claude_model and block.cache_control:
                         tool_result_message[
                             "cache_control"
                         ] = block.cache_control.model_dump()
+                    # 保持工具结果消息的顺序
                     openai_messages.append(tool_result_message)
 
             if role == "user" and openai_parts_for_user_message:
@@ -314,40 +317,34 @@ def convert_anthropic_to_openai_messages(
 
             if role == "assistant":
                 assistant_text = "\n".join(filter(None, text_content_for_assistant))
-                if assistant_text:
+                
+                # 保持助手消息的顺序和结构一致
+                # 如果有文本内容和工具调用，确保它们按原始顺序排列
+                if assistant_text and assistant_tool_calls:
+                    # 先添加文本内容
                     openai_messages.append(
                         {"role": "assistant", "content": assistant_text}
                     )
-
-                if assistant_tool_calls:
-                    if (
-                        openai_messages
-                        and openai_messages[-1]["role"] == "assistant"
-                        and openai_messages[-1].get("content")
-                    ):
-                        openai_messages.append(
-                            {
-                                "role": "assistant",
-                                "content": None,
-                                "tool_calls": assistant_tool_calls,
-                            }
-                        )
-
-                    elif (
-                        openai_messages
-                        and openai_messages[-1]["role"] == "assistant"
-                        and not openai_messages[-1].get("tool_calls")
-                    ):
-                        openai_messages[-1]["tool_calls"] = assistant_tool_calls
-                        openai_messages[-1]["content"] = None
-                    else:
-                        openai_messages.append(
-                            {
-                                "role": "assistant",
-                                "content": None,
-                                "tool_calls": assistant_tool_calls,
-                            }
-                        )
+                    # 再添加工具调用
+                    openai_messages.append(
+                        {
+                            "role": "assistant",
+                            # "content": None,
+                            "tool_calls": assistant_tool_calls,
+                        }
+                    )
+                elif assistant_text:
+                    openai_messages.append(
+                        {"role": "assistant", "content": assistant_text}
+                    )
+                elif assistant_tool_calls:
+                    openai_messages.append(
+                        {
+                            "role": "assistant",
+                            # "content": None,
+                            "tool_calls": assistant_tool_calls,
+                        }
+                    )
 
     # 规范化最终消息
     final_openai_messages = []

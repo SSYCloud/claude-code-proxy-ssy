@@ -46,6 +46,7 @@ unset LOG_FILE_PATH
 unset HOST
 unset PORT
 unset RELOAD
+unset OPEN_CLAUDE_CACHE
 
 # 启动应用
 echo -e "${GREEN}启动应用...${NC}"

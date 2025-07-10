@@ -47,6 +47,7 @@ set LOG_FILE_PATH=
 set HOST=
 set PORT=
 set RELOAD=
+set OPEN_CLAUDE_CACHE=
 
 :: 启动应用
 echo [%GREEN%启动应用...[%NC%

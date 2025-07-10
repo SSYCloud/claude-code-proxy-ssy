@@ -275,6 +275,7 @@ def create_routes(app: FastAPI) -> None:
         )
 
         try:
+            # 记录转换日志，确保保留原始请求和转换后的请求
             log_entry = {
                 "request_id": request_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
