@@ -79,7 +79,7 @@ This document provides a detailed, field-by-field mapping between Anthropic’s 
 
 - **Authorization:** Translate between header formats.
   - Anthropic: `x-api-key: YOUR_ANTHROPIC_API_KEY`
-  - OpenAI: `Authorization: Bearer YOUR_OPENAI_API_KEY`
+  - OpenAI: `Authorization: Bearer YOUR_SSY_API_KEY`
 - **API Version:** Include Anthropic's version header if needed by the client.
   - Anthropic: `anthropic-version: VERSION_STRING` (e.g., `2023-06-01`)
   - OpenAI: Version is typically tied to the model or API path, not a specific header.

@@ -1,284 +1,217 @@
-# Claude Code Provider Proxy (Go版本)
+# Claude Code Proxy
 
-一个高性能的代理服务，将Anthropic Claude API请求转换为OpenAI兼容的API格式。使用Go语言和Gin框架重构，提供更好的性能和并发处理能力。
+Claude Code Proxy 是一个命令行工具，可以将Claude API转换为OpenAI兼容的格式，让您在支持OpenAI API的应用程序中使用Claude模型。
 
-## 功能特性
+## ✨ 功能特性
 
-### 核心功能
-- ✅ 将Anthropic Claude API请求转换为OpenAI API格式
-- ✅ 支持流式和非流式响应
-- ✅ 完整的令牌计数和使用情况跟踪
-- ✅ 全面的错误处理和结构化日志记录
-- ✅ 工具使用支持（Function Calling）
-- ✅ **Cache Control支持** - 完整支持Anthropic的缓存控制功能
-- ✅ **消息顺序保证** - 确保转换前后消息顺序完全一致
+- 🚀 **简单易用**: 一键设置和启动
+- 🔧 **交互式配置**: 引导式配置向导
+- 🌐 **多平台支持**: 支持 Windows、macOS、Linux
+- 🔄 **模型选择**: 支持选择不同的大小模型
+- 📱 **后台运行**: 服务可在后台运行
+- ⚙️ **配置管理**: 简单的配置修改和查看
 
-### 高级功能
-- ✅ 多种内容类型支持（文本、图片、工具调用、工具结果）
-- ✅ 完整的流式响应处理
-- ✅ 速率限制和并发控制
-- ✅ CORS支持和安全头设置
-- ✅ 健康检查和状态监控
-- ✅ Docker容器化支持
-- ✅ 结构化配置管理
+## 📦 安装
 
-### 内容类型支持
-- **文本内容**: 完整支持带cache_control的文本消息
-- **图片内容**: 支持base64编码的图片处理
-- **工具使用**: 完整的Function Calling支持
-- **工具结果**: 工具执行结果的双向转换
-- **缓存控制**: 保持Anthropic cache_control设置
+### 方式一: 下载预编译二进制文件
 
-## 项目结构
+1. 从 [Releases](https://github.com/your-repo/releases) 页面下载适合您操作系统的二进制文件
+2. 解压并将文件放到系统 PATH 中
+3. 运行 `claudeproxy setup` 进行初始化
 
-```
-claude-code-provider-proxy/
-├── main.go                    # 应用入口点
-├── internal/                  # 内部包
-│   ├── config/               # 配置管理
-│   │   └── config.go
-│   ├── models/               # 数据模型
-│   │   ├── anthropic.go      # Anthropic API模型（支持cache_control）
-│   │   └── errors.go         # 错误处理模型
-│   ├── services/             # 服务层
-│   │   ├── conversion.go     # 转换服务（保证消息顺序）
-│   │   ├── streaming.go      # 流式处理服务
-│   │   ├── token_counting.go # 令牌计数服务
-│   │   └── openai_client.go  # OpenAI客户端
-│   ├── middleware/           # 中间件
-│   │   └── middleware.go     # 认证、CORS、日志等
-│   ├── handlers/             # HTTP处理器
-│   │   └── handlers.go
-│   └── server/               # 服务器配置
-│       └── server.go
-├── go.mod                    # Go模块定义
-├── go.sum                    # 依赖锁定文件
-├── .env.example              # 环境变量示例
-├── Dockerfile                # Docker构建文件
-├── docker-compose.yml        # Docker Compose配置
-├── run_app.sh               # 应用启动脚本
-└── run_docker.sh            # Docker启动脚本
-```
+### 方式二: 从源码构建
 
-## 安装和使用
-
-### 方法1：直接运行
-
-1. 确保安装了Go 1.21或更高版本
-2. 克隆仓库并进入目录：
 ```bash
-git clone <repository-url>
+# 克隆仓库
+git clone https://github.com/your-repo/claude-code-provider-proxy.git
 cd claude-code-provider-proxy
+
+# 构建当前平台
+make build
+
+# 或构建所有平台
+make build-all
+
+# 安装到本地 (仅 macOS/Linux)
+make install
 ```
 
-3. 配置环境变量：
+## 🚀 快速开始
+
+### 1. 初始化配置
+
 ```bash
-cp .env.example .env
-# 编辑.env文件，设置你的OpenAI API密钥
+claudeproxy setup
 ```
 
-4. 运行应用：
+这个命令会:
+- 引导您输入胜算云 API 密钥
+- 获取可用模型列表
+- 让您选择大模型和小模型
+- 保存配置到 `~/.claudeproxy/.env`
+
+### 2. 启动服务
+
 ```bash
-./run_app.sh
+claudeproxy start
 ```
 
-### 方法2：使用Docker
+服务将在后台启动，默认监听 `http://127.0.0.1:3180`
 
-1. 配置环境变量：
+**自动配置 Claude 环境变量**: 服务启动成功后，会自动设置以下环境变量，方便Claude Desktop等应用直接使用：
+
+- `ANTHROPIC_BASE_URL=http://127.0.0.1:3180` (或您配置的HOST:PORT)
+- `ANTHROPIC_AUTH_TOKEN=claudeproxy`
+
+### 3. 使用服务
+
+现在您可以将任何支持 OpenAI API 的应用程序配置为使用 `http://127.0.0.1:3180` 作为 API 端点。
+
+对于Claude Desktop等原生支持Anthropic API的应用，环境变量已自动配置，无需额外设置。
+
+## 📋 命令使用
+
+### 基本命令
+
 ```bash
-cp .env.example .env
-# 编辑.env文件
+# 查看帮助
+claudeproxy --help
+
+# 初始化配置
+claudeproxy setup
+
+# 启动服务
+claudeproxy start
+
+# 停止服务
+claudeproxy stop
+
+# 查看服务状态
+claudeproxy status
+
+# 查看当前配置
+claudeproxy config
+
+# 修改配置
+claudeproxy set
+
+# 清除所有环境变量和配置
+claudeproxy clean
 ```
 
-2. 使用Docker运行：
+### 配置修改
+
+使用 `claudeproxy set` 命令可以:
+
+- 修改 API 密钥
+- 重新选择模型
+- 查看当前配置
+- 重新初始化配置
+
+### 清理配置
+
+使用 `claudeproxy clean` 命令可以完全清除所有项目相关的配置：
+
+- 停止正在运行的服务
+- 清除所有环境变量（包括ANTHROPIC_*变量，当前终端和全局环境）
+- 删除配置文件
+- 需要重启终端以确保环境变量完全清除
+
+## ⚙️ 配置选项
+
+默认配置保存在 `~/.claudeproxy/.env` 文件中:
+
 ```bash
-./run_docker.sh
+BASE_URL=https://router.shengsuanyun.com/api/v1
+REFERRER_URL=https://www.shengsuanyun.com
+APP_NAME=ClaudeCodeProxy
+APP_VERSION=1.0.0
+HOST=127.0.0.1
+PORT=3180
+RELOAD=true
+OPEN_CLAUDE_CACHE=true
+LOG_LEVEL=INFO
+SSY_API_KEY=your-api-key
+BIG_MODEL_NAME=selected-big-model
+SMALL_MODEL_NAME=selected-small-model
 ```
 
-## API端点
+您也可以通过环境变量覆盖这些设置。
 
-### 核心端点
-- `GET /` - 健康检查
-- `GET /health` - 健康检查
-- `GET /status` - 详细状态信息
-- `POST /v1/messages` - 创建消息（完全兼容Anthropic API）
-- `POST /v1/messages/count_tokens` - 计算令牌数量
+## 🔧 开发
 
-### 工具端点
-- `GET /v1/models` - 获取可用模型列表
-- `POST /v1/validate` - 验证API密钥
+### 前置要求
 
-## 使用示例
+- Go 1.21 或更高版本
+- Make (可选)
 
-### 基本消息请求
+### 开发命令
+
 ```bash
-curl -X POST http://localhost:8000/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key" \
-  -H "anthropic-version: 2023-06-01" \
-  -d '{
-    "model": "claude-3-opus-20240229",
-    "max_tokens": 1000,
-    "messages": [
-      {
-        "role": "user",
-        "content": "Hello, how are you?"
-      }
-    ],
-    "system": "You are a helpful assistant."
-  }'
-```
-
-### 带Cache Control的请求
-```bash
-curl -X POST http://localhost:8000/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key" \
-  -H "anthropic-version: 2023-06-01" \
-  -d '{
-    "model": "claude-3-opus-20240229",
-    "max_tokens": 1000,
-    "messages": [
-      {
-        "role": "user",
-        "content": [
-          {
-            "type": "text",
-            "text": "This is cached content",
-            "cache_control": {"type": "ephemeral"}
-          }
-        ]
-      }
-    ]
-  }'
-```
-
-### 流式请求
-```bash
-curl -X POST http://localhost:8000/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key" \
-  -H "anthropic-version: 2023-06-01" \
-  -d '{
-    "model": "claude-3-opus-20240229",
-    "max_tokens": 1000,
-    "stream": true,
-    "messages": [
-      {
-        "role": "user",
-        "content": "Tell me a story"
-      }
-    ]
-  }'
-```
-
-## 配置选项
-
-### 环境变量
-```bash
-# 服务器配置
-PORT=8000                    # 服务端口
-HOST=0.0.0.0                # 绑定地址
-
-# OpenAI API配置
-OPENAI_API_KEY=your-key      # OpenAI API密钥（必需）
-OPENAI_BASE_URL=https://api.openai.com/v1  # OpenAI API基础URL
-OPENAI_MODEL=gpt-4           # 默认使用的OpenAI模型
-OPENAI_MAX_TOKENS=4096       # 最大令牌数
-
-# 日志配置
-LOG_LEVEL=info               # 日志级别 (debug, info, warn, error)
-
-# 速率限制
-RATE_LIMIT=100               # 每分钟请求限制
-```
-
-## 特性详解
-
-### Cache Control支持
-- 完整保持Anthropic的`cache_control`设置
-- 在转换过程中标记缓存控制的内容
-- 响应时恢复原始的缓存控制信息
-
-### 消息顺序保证
-- 转换前后消息顺序完全一致
-- 内置验证机制确保顺序正确性
-- 支持复杂的消息结构和嵌套内容
-
-### 内容类型处理
-- **文本**: 支持简单文本和复杂文本结构
-- **图片**: 处理base64编码的图片数据
-- **工具使用**: 完整的Function Calling支持
-- **工具结果**: 双向转换工具执行结果
-
-### 错误处理
-- 结构化错误响应
-- 详细的错误日志记录
-- 优雅的错误恢复机制
-
-## 性能特性
-
-- **高并发**: 基于Go的高性能并发处理
-- **低延迟**: 优化的请求转换和处理流程
-- **内存效率**: 流式处理减少内存占用
-- **可扩展**: 支持水平扩展和负载均衡
-
-## 监控和日志
-
-### 健康检查
-```bash
-curl http://localhost:8000/health
-```
-
-### 详细状态
-```bash
-curl http://localhost:8000/status
-```
-
-### 日志格式
-使用结构化JSON日志，包含：
-- 请求ID跟踪
-- 性能指标
-- 错误详情
-- Cache control使用情况
-
-## 开发和贡献
-
-### 本地开发
-```bash
-# 安装依赖
-go mod download
+# 运行开发版本
+make dev
 
 # 运行测试
-go test ./...
+make test
 
-# 构建
-go build -o claude-proxy .
+# 格式化代码
+make fmt
 
-# 运行
-./claude-proxy
+# 代码检查
+make lint
+
+# 构建所有平台
+make build-all
 ```
 
-### Docker开发
-```bash
-# 构建镜像
-docker build -t claude-proxy .
+### 项目结构
 
-# 运行容器
-docker run -p 8000:8000 --env-file .env claude-proxy
+```
+├── cmd/cli/            # CLI 应用程序
+├── internal/
+│   ├── cli/           # CLI 相关功能
+│   ├── config/        # 配置管理
+│   ├── handlers/      # HTTP 处理器
+│   ├── middleware/    # 中间件
+│   ├── models/        # 数据模型
+│   ├── server/        # 服务器
+│   └── services/      # 业务逻辑
+├── build.sh           # 构建脚本 (Linux/macOS)
+├── build.bat          # 构建脚本 (Windows)
+├── Makefile           # Make 构建文件
+└── main.go            # 主程序
 ```
 
-## 许可证
+## 🐛 故障排除
 
-[MIT](LICENSE)
+### 服务无法启动
 
-## 更新日志
+1. 检查端口 3180 是否被占用
+2. 确保 API 密钥有效
+3. 查看配置是否正确: `claudeproxy config`
 
-### v1.0.0 (Go重构版本)
-- ✅ 完整的Python功能移植
-- ✅ Cache Control完整支持
-- ✅ 消息顺序严格保证
-- ✅ 高性能Go实现
-- ✅ 完整的错误处理
-- ✅ Docker容器化支持
-- ✅ 结构化日志和监控
+### 模型列表获取失败
+
+1. 检查网络连接
+2. 验证 API 密钥是否有效
+3. 确保能访问 `https://router.shengsuanyun.com`
+
+### 配置文件丢失
+
+运行 `claudeproxy setup` 重新初始化配置。
+
+## 📄 许可证
+
+本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📞 支持
+
+如果您遇到问题或有建议，请：
+
+1. 查看 [Issues](https://github.com/your-repo/issues) 页面
+2. 创建新的 Issue
+3. 联系支持团队

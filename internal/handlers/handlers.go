@@ -281,9 +281,9 @@ func (h *Handler) GetStatus(c *gin.Context) {
 		"version":   h.config.AppVersion,
 		"referrer":  h.config.ReferrerURL,
 		"config": gin.H{
-			"openai_base_url": h.config.OpenAIBaseURL,
-			"big_model":       h.config.BigModelName,
-			"small_model":     h.config.SmallModelName,
+			"base_url":    h.config.OpenAIBaseURL,
+			"big_model":   h.config.BigModelName,
+			"small_model": h.config.SmallModelName,
 		},
 		"models": h.modelSelector.GetAvailableModels(),
 	}
