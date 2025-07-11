@@ -17,7 +17,7 @@ Claude Code Proxy SSY 是一个命令行工具，可以将Claude API转换为胜
 
 **Linux/macOS:**
 ```bash
-sudo curl -o /usr/local/bin/claudeproxy -L https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_$(uname -s)_$(uname -m)
+sudo curl -o /usr/local/bin/claudeproxy -L https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_`uname -s`_`uname -m`
 sudo chmod +x /usr/local/bin/claudeproxy
 ```
 
