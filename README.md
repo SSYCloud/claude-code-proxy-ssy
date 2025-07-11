@@ -13,6 +13,19 @@ Claude Code Proxy SSY 是一个命令行工具，可以将Claude API转换为胜
 
 ## 📦 安装
 
+### 使用前提（安装Claude Code）
+
+```shell
+npm install -g @anthropic-ai/claude-code
+```
+
+国内安装
+```shell
+npm config set registry https://registry.npmmirror.com
+npm install -g @anthropic-ai/claude-code
+```
+
+
 ### 方式一: 快速安装（推荐）
 
 **Linux/macOS:**
@@ -26,15 +39,6 @@ sudo curl -o /usr/local/bin/claudeproxy -L https://shengsuanyun.oss-cn-shanghai.
 sudo chmod +x /usr/local/bin/claudeproxy
 ```
 
-**Windows (PowerShell):**
-```powershell
-Invoke-WebRequest -Uri "https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_Windows_x86_64.exe" -OutFile "claudeproxy.exe"
-```
-国内安装方式
-```powershell
-Invoke-WebRequest -Uri "https://shengsuanyun.oss-cn-shanghai.aliyuncs.com/claude-code-proxy-ssy/claudeproxy_Windows_x86_64.exe" -OutFile "claudeproxy.exe"
-```
-
 ### 方式二: 手动下载
 
 1. 从 [Releases](https://github.com/SSYCloud/claude-code-proxy-ssy/releases) 页面下载适合您操作系统的二进制文件
@@ -46,8 +50,6 @@ Invoke-WebRequest -Uri "https://shengsuanyun.oss-cn-shanghai.aliyuncs.com/claude
 - **Linux ARM64**: claudeproxy_Linux_arm64
 - **macOS Intel**: claudeproxy_Darwin_x86_64
 - **macOS Apple Silicon**: claudeproxy_Darwin_arm64
-- **Windows x86_64**: claudeproxy_Windows_x86_64.exe
-- **Windows ARM64**: claudeproxy_Windows_arm64.exe
 
 ### 方式四: 从源码构建
 
