@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -36,6 +38,11 @@ func New(cfg *config.Config) *Server {
 	}
 	logger.SetLevel(level)
 	logger.SetFormatter(&logrus.JSONFormatter{})
+
+	// Setup log file
+	if err := setupLogFile(logger); err != nil {
+		logger.WithError(err).Warn("Failed to setup log file, using stdout")
+	}
 
 	// Log application startup
 	logger.WithFields(logrus.Fields{
@@ -192,5 +199,32 @@ func (s *Server) Stop() error {
 		defer cancel()
 		return s.httpServer.Shutdown(ctx)
 	}
+	return nil
+}
+
+// setupLogFile configures the logger to write to a file
+func setupLogFile(logger *logrus.Logger) error {
+	// Get home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	// Create log directory
+	logDir := filepath.Join(homeDir, ".claudeproxy", "logs")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return err
+	}
+
+	// Create log file
+	logFile := filepath.Join(logDir, "service.log")
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
+
+	// Set output to both file and stdout
+	logger.SetOutput(io.MultiWriter(os.Stdout, file))
+
 	return nil
 }

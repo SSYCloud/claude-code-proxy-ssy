@@ -24,36 +24,92 @@ func PromptForAPIKey() (string, error) {
 	return strings.TrimSpace(result), nil
 }
 
-// PromptForModel prompts user to select a model
+// PromptForModel prompts user to select a model with fuzzy search
 func PromptForModel(models []Model, modelType string) (string, error) {
 	if len(models) == 0 {
 		return "", fmt.Errorf("没有可用的模型")
 	}
 
-	// Create display items for models
-	items := make([]string, len(models))
-	for i, model := range models {
-		items[i] = fmt.Sprintf("%s (%s) - %s", model.Name, model.APIName, model.Company)
+	fmt.Printf("\n💡 共找到 %d 个模型，您可以输入关键词进行搜索筛选\n", len(models))
+	fmt.Println("💡 搜索支持: 模型名称、API名称、公司名称")
+	fmt.Println("💡 留空直接回车可查看所有模型")
+
+	// Add specific guidance based on model type
+	if modelType == "大" {
+		fmt.Println("🎯 大模型用于处理复杂任务，推荐使用高性能模型")
+		fmt.Println("💡 建议选择: Claude-Sonnet、Gemini Pro等高性能模型")
+	} else if modelType == "小" {
+		fmt.Println("🎯 小模型用于处理简单任务，推荐使用高性价比模型")
+		fmt.Println("💡 建议选择: DeepSeek、Doubao、Qwen等高性价比模型")
 	}
 
-	prompt := promptui.Select{
-		Label: fmt.Sprintf("请选择%s模型", modelType),
-		Items: items,
-		Size:  10,
-		Templates: &promptui.SelectTemplates{
-			Label:    "{{ . }}:",
-			Active:   "▶ {{ . | cyan }}",
-			Inactive: "  {{ . }}",
-			Selected: "✓ {{ . | green }}",
-		},
-	}
+	for {
+		// Prompt for search keyword
+		searchPrompt := promptui.Prompt{
+			Label: fmt.Sprintf("请输入搜索关键词 (为%s模型)", modelType),
+			Validate: func(input string) error {
+				// Allow empty input
+				return nil
+			},
+		}
 
-	index, _, err := prompt.Run()
-	if err != nil {
-		return "", fmt.Errorf("选择模型失败: %v", err)
-	}
+		searchKeyword, err := searchPrompt.Run()
+		if err != nil {
+			return "", fmt.Errorf("输入搜索关键词失败: %v", err)
+		}
 
-	return models[index].APIName, nil
+		// Filter models based on search keyword
+		var filteredModels []Model
+		var filteredItems []string
+
+		searchKeyword = strings.ToLower(strings.TrimSpace(searchKeyword))
+
+		for _, model := range models {
+			if searchKeyword == "" ||
+				strings.Contains(strings.ToLower(model.Name), searchKeyword) ||
+				strings.Contains(strings.ToLower(model.APIName), searchKeyword) ||
+				strings.Contains(strings.ToLower(model.Company), searchKeyword) {
+				filteredModels = append(filteredModels, model)
+				filteredItems = append(filteredItems, fmt.Sprintf("%s (%s) - %s", model.Name, model.APIName, model.Company))
+			}
+		}
+
+		if len(filteredModels) == 0 {
+			fmt.Printf("❌ 没有找到匹配关键词 '%s' 的模型，请重新搜索\n", searchKeyword)
+			continue // Retry in the same loop
+		}
+
+		fmt.Printf("\n✅ 找到 %d 个匹配的模型\n", len(filteredModels))
+
+		// Add option to search again
+		filteredItems = append([]string{"🔍 重新搜索 (输入新的关键词)"}, filteredItems...)
+
+		// Show selection prompt
+		selectPrompt := promptui.Select{
+			Label: fmt.Sprintf("请选择%s模型", modelType),
+			Items: filteredItems,
+			Size:  15,
+			Templates: &promptui.SelectTemplates{
+				Label:    "{{ . }}:",
+				Active:   "▶ {{ . | cyan }}",
+				Inactive: "  {{ . }}",
+				Selected: "✓ {{ . | green }}",
+			},
+		}
+
+		index, _, err := selectPrompt.Run()
+		if err != nil {
+			return "", fmt.Errorf("选择模型失败: %v", err)
+		}
+
+		// Check if user wants to search again
+		if index == 0 {
+			continue // Retry search in the same loop
+		}
+
+		// Adjust index for actual model selection (subtract 1 for the search option)
+		return filteredModels[index-1].APIName, nil
+	}
 }
 
 // ConfirmAction prompts user for confirmation

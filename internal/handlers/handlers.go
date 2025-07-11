@@ -90,20 +90,20 @@ func (h *Handler) CreateMessage(c *gin.Context) {
 	}).Info("Processing message request")
 
 	// Validate token limits
-	tokenReq := &models.TokenCountRequest{
-		Model:    req.Model,
-		Messages: req.Messages,
-		System:   req.System,
-		Tools:    req.Tools,
-	}
+	// tokenReq := &models.TokenCountRequest{
+	// 	Model:    req.Model,
+	// 	Messages: req.Messages,
+	// 	System:   req.System,
+	// 	Tools:    req.Tools,
+	// }
 
-	if err := h.tokenService.ValidateTokenLimits(tokenReq); err != nil {
-		h.logger.WithError(err).Warn("Token limit exceeded")
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.NewValidationError(err.Error()),
-		})
-		return
-	}
+	// if err := h.tokenService.ValidateTokenLimits(tokenReq); err != nil {
+	// 	h.logger.WithError(err).Warn("Token limit exceeded")
+	// 	c.JSON(http.StatusBadRequest, models.ErrorResponse{
+	// 		Error: models.NewValidationError(err.Error()),
+	// 	})
+	// 	return
+	// }
 
 	// Convert to OpenAI format
 	openAIReq, err := h.conversionService.ConvertAnthropicToOpenAI(&req, "gpt-4") // Simple fallback

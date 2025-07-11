@@ -14,11 +14,13 @@ import (
 var (
 	configManager  *cli.ConfigManager
 	serviceManager *cli.ServiceManager
+	logManager     *cli.LogManager
 )
 
 func init() {
 	configManager = cli.NewConfigManager()
 	serviceManager = cli.NewServiceManager(configManager)
+	logManager = cli.NewLogManager()
 }
 
 func main() {
@@ -26,13 +28,20 @@ func main() {
 		Use:   "claudeproxy",
 		Short: "Claude Code Proxy - 将Claude API转换为胜算云格式的代理服务",
 		Long: `Claude Code Proxy 是一个代理服务，可以将Claude API调用转换为胜算云格式。
-它允许您在支持OpenAI API的应用程序中使用Claude模型。`,
-		Run: func(cmd *cobra.Command, args []string) {
+它允许您在支持Claude应用程序中使用胜算云全球模型API。`,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// 如果配置不存在，运行初始设置
 			if !configManager.ConfigExists() {
 				runInitialSetup()
-			} else {
-				cmd.Help()
+				return nil
 			}
+
+			// 如果配置存在，显示帮助
+			return cmd.Help()
 		},
 	}
 
@@ -195,6 +204,45 @@ func main() {
 		},
 	}
 
+	// Log command
+	var logCmd = &cobra.Command{
+		Use:   "log",
+		Short: "查看服务日志",
+		Long:  "查看Claude代理服务的日志文件",
+		Run: func(cmd *cobra.Command, args []string) {
+			// Show log info by default
+			if err := logManager.ShowLogInfo(); err != nil {
+				cli.ShowError(err)
+			}
+		},
+	}
+
+	// Add flags for log command
+	var logLines int
+	var logFollow bool
+	var logClear bool
+
+	logCmd.Flags().IntVarP(&logLines, "lines", "l", 100, "显示最后多少行日志")
+	logCmd.Flags().BoolVarP(&logFollow, "follow", "f", false, "实时监控日志")
+	logCmd.Flags().BoolVar(&logClear, "clear", false, "清除日志文件")
+
+	logCmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if logClear {
+			return logManager.ClearLogs()
+		}
+
+		if logFollow {
+			return logManager.FollowLogs()
+		}
+
+		if cmd.Flags().Changed("lines") {
+			return logManager.ViewLogs(logLines)
+		}
+
+		// Default: show log info
+		return logManager.ShowLogInfo()
+	}
+
 	// Add commands to root
 	rootCmd.AddCommand(setupCmd)
 	rootCmd.AddCommand(startCmd)
@@ -203,8 +251,8 @@ func main() {
 	rootCmd.AddCommand(setCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(cleanCmd)
+	rootCmd.AddCommand(logCmd)
 	rootCmd.AddCommand(serverCmd)
-	rootCmd.AddCommand(cleanCmd)
 
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
