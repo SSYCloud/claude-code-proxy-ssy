@@ -98,7 +98,7 @@ jobs:
           
           **Linux/macOS:**
           ```bash
-          sudo curl -o /usr/local/bin/claudeproxy -L https://github.com/${{ github.repository }}/releases/latest/download/claudeproxy_$(uname -s)_$(uname -m)
+          sudo curl -o /usr/local/bin/claudeproxy -L https://github.com/${{ github.repository }}/releases/latest/download/claudeproxy_`uname -s`_`uname -m`
           sudo chmod +x /usr/local/bin/claudeproxy
           ```
           
