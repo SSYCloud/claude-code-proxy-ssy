@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -213,12 +215,53 @@ func (sm *ServiceManager) setAnthropicEnvVars(host, port string) error {
 		"ANTHROPIC_AUTH_TOKEN": "claudeproxy",
 	}
 
+	// Set environment variables silently
 	for key, value := range envVars {
-		if err := sm.configManager.UpdateGlobalEnvVar(key, value); err != nil {
+		if err := sm.configManager.UpdateGlobalEnvVarSilent(key, value); err != nil {
 			return fmt.Errorf("设置 %s 失败: %v", key, err)
 		}
-		fmt.Printf("✅ 已设置环境变量 %s=%s\n", key, value)
 	}
 
+	// Print unified success message
+	fmt.Printf("✅ 已设置环境变量 ANTHROPIC_AUTH_TOKEN、ANTHROPIC_BASE_URL\n")
+
+	// Provide platform-specific export commands
+	sm.printExportCommands(baseURL)
+
 	return nil
+}
+
+// printExportCommands prints the appropriate export commands for the current platform
+func (sm *ServiceManager) printExportCommands(baseURL string) {
+	fmt.Printf("💡 提示: 请重启终端，或者在当前终端执行以下命令：\n")
+
+	// Check if it's a Windows environment
+	if runtime.GOOS == "windows" {
+		// Windows uses different syntax for different shells
+		fmt.Printf("set ANTHROPIC_BASE_URL=%s\n", baseURL)
+		fmt.Printf("set ANTHROPIC_AUTH_TOKEN=claudeproxy\n")
+	} else {
+		// Unix-like systems (macOS, Linux)
+		// Detect current shell
+		shell := os.Getenv("SHELL")
+
+		// Try to get shell info from parent process
+		if shell == "" {
+			shell = "/bin/bash" // default fallback
+		}
+
+		// For Unix systems, export syntax is standard
+		fmt.Printf("export ANTHROPIC_BASE_URL=%s\n", baseURL)
+		fmt.Printf("export ANTHROPIC_AUTH_TOKEN=claudeproxy\n")
+
+		// Add shell-specific hint
+		if strings.Contains(shell, "zsh") {
+			fmt.Printf("# 或者添加到 ~/.zshrc 文件中\n")
+		} else if strings.Contains(shell, "bash") {
+			fmt.Printf("# 或者添加到 ~/.bashrc 或 ~/.bash_profile 文件中\n")
+		} else if strings.Contains(shell, "fish") {
+			fmt.Printf("# Fish shell 用户请使用: set -gx ANTHROPIC_BASE_URL %s\n", baseURL)
+			fmt.Printf("# Fish shell 用户请使用: set -gx ANTHROPIC_AUTH_TOKEN claudeproxy\n")
+		}
+	}
 }

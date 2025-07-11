@@ -1,210 +1,111 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
-// ConfigManager handles configuration file operations
+// ConfigManager handles configuration operations
 type ConfigManager struct {
-	configPath string
+	jsonConfigManager *JSONConfigManager
 }
 
 // NewConfigManager creates a new configuration manager
 func NewConfigManager() *ConfigManager {
-	// Get user's home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		// Fallback to current directory
-		homeDir, _ = os.Getwd()
-	}
-
-	configDir := filepath.Join(homeDir, ".claudeproxy")
-	os.MkdirAll(configDir, 0755)
-
 	return &ConfigManager{
-		configPath: filepath.Join(configDir, ".env"),
+		jsonConfigManager: NewJSONConfigManager(),
 	}
 }
 
-// SetDefaults sets the default environment variables
+// SetDefaults sets the default configuration values
 func (cm *ConfigManager) SetDefaults() error {
-	defaults := map[string]string{
-		"BASE_URL":          "https://router.shengsuanyun.com/api/v1",
-		"REFERRER_URL":      "https://www.shengsuanyun.com",
-		"APP_NAME":          "ClaudeCodeProxy",
-		"APP_VERSION":       "1.0.0",
-		"HOST":              "127.0.0.1",
-		"PORT":              "3180",
-		"RELOAD":            "true",
-		"OPEN_CLAUDE_CACHE": "true",
-		"LOG_LEVEL":         "INFO",
-	}
-
-	return cm.updateConfig(defaults)
+	return cm.jsonConfigManager.SetDefaults()
 }
 
-// SetAPIKey sets the OpenAI API key
+// SetAPIKey sets the API key
 func (cm *ConfigManager) SetAPIKey(apiKey string) error {
-	// Only update local config, global env vars will be updated by caller if needed
-	return cm.updateConfig(map[string]string{
+	return cm.jsonConfigManager.UpdateConfig(map[string]string{
 		"SSY_API_KEY": apiKey,
 	})
 }
 
 // SetModels sets the big and small model names
 func (cm *ConfigManager) SetModels(bigModel, smallModel string) error {
-	// Only update local config, global env vars will be updated by caller if needed
-	return cm.updateConfig(map[string]string{
+	return cm.jsonConfigManager.UpdateConfig(map[string]string{
 		"BIG_MODEL_NAME":   bigModel,
 		"SMALL_MODEL_NAME": smallModel,
 	})
 }
 
-// LoadConfig loads configuration from file and sets environment variables
+// LoadConfig loads configuration from JSON file
 func (cm *ConfigManager) LoadConfig() error {
-	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
-		return fmt.Errorf("配置文件不存在: %s", cm.configPath)
+	// For backward compatibility, we just check if config exists
+	if !cm.jsonConfigManager.ConfigExists() {
+		return fmt.Errorf("配置文件不存在")
 	}
-
-	return godotenv.Load(cm.configPath)
+	return nil
 }
 
 // GetConfig gets a configuration value
 func (cm *ConfigManager) GetConfig(key string) string {
-	return os.Getenv(key)
+	return cm.jsonConfigManager.GetConfig(key)
 }
 
-// updateConfig updates the configuration file with new values
+// updateConfig updates the configuration with new values
 func (cm *ConfigManager) updateConfig(updates map[string]string) error {
-	// Read existing config
-	existing := make(map[string]string)
-	if _, err := os.Stat(cm.configPath); err == nil {
-		envMap, err := godotenv.Read(cm.configPath)
-		if err != nil {
-			return fmt.Errorf("读取配置文件失败: %v", err)
-		}
-		existing = envMap
-	}
-
-	// Update with new values
-	for key, value := range updates {
-		existing[key] = value
-	}
-
-	// Write back to file
-	file, err := os.Create(cm.configPath)
-	if err != nil {
-		return fmt.Errorf("创建配置文件失败: %v", err)
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	for key, value := range existing {
-		fmt.Fprintf(writer, "%s=%s\n", key, value)
-	}
-
-	return writer.Flush()
+	return cm.jsonConfigManager.UpdateConfig(updates)
 }
 
-// ConfigExists checks if config file exists
+// ConfigExists checks if the configuration file exists
 func (cm *ConfigManager) ConfigExists() bool {
-	_, err := os.Stat(cm.configPath)
-	return err == nil
+	return cm.jsonConfigManager.ConfigExists()
 }
 
-// GetConfigPath returns the path to the config file
+// GetConfigPath returns the path to the configuration file
 func (cm *ConfigManager) GetConfigPath() string {
-	return cm.configPath
+	return cm.jsonConfigManager.GetConfigPath()
 }
 
-// DeleteConfig removes the configuration file
+// DeleteConfig deletes the configuration file
 func (cm *ConfigManager) DeleteConfig() error {
-	return os.Remove(cm.configPath)
+	return cm.jsonConfigManager.DeleteConfig()
 }
 
-// ListConfig displays all current configuration
+// ListConfig displays the current configuration
 func (cm *ConfigManager) ListConfig() error {
-	if !cm.ConfigExists() {
-		fmt.Println("配置文件不存在")
-		return nil
-	}
-
-	envMap, err := godotenv.Read(cm.configPath)
-	if err != nil {
-		return fmt.Errorf("读取配置文件失败: %v", err)
-	}
-
-	fmt.Printf("\n当前配置 (%s):\n", cm.configPath)
-	fmt.Println(strings.Repeat("-", 50))
-
-	for key, value := range envMap {
-		// Hide sensitive information
-		if key == "SSY_API_KEY" && value != "" {
-			maskedValue := value[:min(8, len(value))] + strings.Repeat("*", max(0, len(value)-8))
-			fmt.Printf("%-20s: %s\n", key, maskedValue)
-		} else {
-			fmt.Printf("%-20s: %s\n", key, value)
-		}
-	}
-	fmt.Println()
-
-	return nil
+	return cm.jsonConfigManager.ListConfig()
 }
 
-// CheckExistingEnvVars checks if important environment variables already exist
+// CheckExistingEnvVars checks for existing configuration values
 func (cm *ConfigManager) CheckExistingEnvVars() map[string]string {
-	existing := make(map[string]string)
-
-	// Check for existing environment variables
-	if apiKey := os.Getenv("SSY_API_KEY"); apiKey != "" {
-		existing["SSY_API_KEY"] = apiKey
-	}
-
-	if bigModel := os.Getenv("BIG_MODEL_NAME"); bigModel != "" {
-		existing["BIG_MODEL_NAME"] = bigModel
-	}
-
-	if smallModel := os.Getenv("SMALL_MODEL_NAME"); smallModel != "" {
-		existing["SMALL_MODEL_NAME"] = smallModel
-	}
-
-	return existing
+	return cm.jsonConfigManager.CheckExistingConfig()
 }
 
-// UpdateGlobalEnvVar updates a global environment variable
-func (cm *ConfigManager) UpdateGlobalEnvVar(key, value string) error {
-	// Update local config first
-	if err := cm.updateConfig(map[string]string{key: value}); err != nil {
-		return err
+// UpdateGlobalEnvVarSilent updates a global environment variable without printing messages
+func (cm *ConfigManager) UpdateGlobalEnvVarSilent(key, value string) error {
+	// Only handle ANTHROPIC environment variables
+	if !strings.HasPrefix(key, "ANTHROPIC_") {
+		return fmt.Errorf("只支持ANTHROPIC_开头的环境变量")
 	}
 
 	// Update global environment variable based on the OS
 	switch runtime.GOOS {
 	case "darwin", "linux":
-		if err := cm.updateUnixEnvVar(key, value); err != nil {
-			return err
-		}
-		fmt.Printf("💡 提示: 请重启终端或执行 'source ~/.zshrc' 和 'source ~/.bash_profile' 来使环境变量在所有shell中生效\n")
-		return nil
+		return cm.updateUnixEnvVarSilent(key, value)
 	case "windows":
-		return cm.updateWindowsEnvVar(key, value)
+		return cm.updateWindowsEnvVarSilent(key, value)
 	default:
 		// For other systems, just update local config
-		fmt.Printf("⚠️  本系统不支持自动更新全局环境变量，请手动设置 %s=%s\n", key, value)
 		return nil
 	}
 }
 
-// updateUnixEnvVar updates environment variable on Unix-like systems
-func (cm *ConfigManager) updateUnixEnvVar(key, value string) error {
+// updateUnixEnvVarSilent updates environment variable on Unix-like systems without printing messages
+func (cm *ConfigManager) updateUnixEnvVarSilent(key, value string) error {
 	homeDir, _ := os.UserHomeDir()
 
 	// List of possible shell configuration files
@@ -231,8 +132,8 @@ func (cm *ConfigManager) updateUnixEnvVar(key, value string) error {
 	updated := false
 	for _, profileFile := range profileFiles {
 		if _, err := os.Stat(profileFile); err == nil {
-			if err := cm.updateShellProfile(profileFile, key, value); err != nil {
-				fmt.Printf("⚠️  更新 %s 失败: %v\n", profileFile, err)
+			if err := cm.updateShellProfileSilent(profileFile, key, value); err != nil {
+				continue // Silent failure
 			} else {
 				updated = true
 			}
@@ -242,7 +143,7 @@ func (cm *ConfigManager) updateUnixEnvVar(key, value string) error {
 	// If no existing profile files found, create .profile
 	if !updated {
 		profileFile := filepath.Join(homeDir, ".profile")
-		if err := cm.updateShellProfile(profileFile, key, value); err != nil {
+		if err := cm.updateShellProfileSilent(profileFile, key, value); err != nil {
 			return fmt.Errorf("创建 .profile 失败: %v", err)
 		}
 	}
@@ -250,8 +151,8 @@ func (cm *ConfigManager) updateUnixEnvVar(key, value string) error {
 	return nil
 }
 
-// updateWindowsEnvVar updates environment variable on Windows
-func (cm *ConfigManager) updateWindowsEnvVar(key, value string) error {
+// updateWindowsEnvVarSilent updates environment variable on Windows without printing messages
+func (cm *ConfigManager) updateWindowsEnvVarSilent(key, value string) error {
 	// Use setx command to set user environment variable
 	cmd := exec.Command("setx", key, value)
 	if err := cmd.Run(); err != nil {
@@ -261,12 +162,11 @@ func (cm *ConfigManager) updateWindowsEnvVar(key, value string) error {
 	// Also set it for current session
 	os.Setenv(key, value)
 
-	fmt.Printf("✅ 已更新Windows环境变量 %s\n", key)
 	return nil
 }
 
-// updateShellProfile updates shell profile file
-func (cm *ConfigManager) updateShellProfile(profileFile, key, value string) error {
+// updateShellProfileSilent updates shell profile file without printing messages
+func (cm *ConfigManager) updateShellProfileSilent(profileFile, key, value string) error {
 	exportLine := fmt.Sprintf("export %s=\"%s\"", key, value)
 
 	// Read existing content
@@ -299,55 +199,33 @@ func (cm *ConfigManager) updateShellProfile(profileFile, key, value string) erro
 	// Set for current session
 	os.Setenv(key, value)
 
-	fmt.Printf("✅ 已更新环境变量 %s 到 %s\n", key, filepath.Base(profileFile))
 	return nil
 }
 
-// HasConfigChanged checks if the new config values differ from current ones
-func (cm *ConfigManager) HasConfigChanged(newValues map[string]string) bool {
-	for key, newValue := range newValues {
-		if currentValue := cm.GetConfig(key); currentValue != newValue {
-			return true
-		}
-	}
-	return false
-}
-
-// ClearAllEnvVars clears all project-related environment variables
+// ClearAllEnvVars clears all ANTHROPIC environment variables
 func (cm *ConfigManager) ClearAllEnvVars() error {
-	projectEnvVars := []string{
-		"SSY_API_KEY",
-		"BIG_MODEL_NAME",
-		"SMALL_MODEL_NAME",
-		"BASE_URL",
-		"REFERRER_URL",
-		"APP_NAME",
-		"APP_VERSION",
-		"HOST",
-		"PORT",
-		"RELOAD",
-		"OPEN_CLAUDE_CACHE",
-		"LOG_LEVEL",
-		"ANTHROPIC_BASE_URL",   // 添加ANTHROPIC相关环境变量
-		"ANTHROPIC_AUTH_TOKEN", // 添加ANTHROPIC相关环境变量
+	// Only clear ANTHROPIC environment variables
+	anthropicEnvVars := []string{
+		"ANTHROPIC_BASE_URL",
+		"ANTHROPIC_AUTH_TOKEN",
 	}
 
-	fmt.Println("🧹 正在清除项目相关的环境变量...")
+	fmt.Println("🧹 正在清除ANTHROPIC相关的环境变量...")
 
 	// Clear from current session
-	for _, key := range projectEnvVars {
+	for _, key := range anthropicEnvVars {
 		os.Unsetenv(key)
 	}
 
 	// Clear from global environment based on OS
 	switch runtime.GOOS {
 	case "darwin", "linux":
-		return cm.clearUnixEnvVars(projectEnvVars)
+		return cm.clearUnixEnvVars(anthropicEnvVars)
 	case "windows":
-		return cm.clearWindowsEnvVars(projectEnvVars)
+		return cm.clearWindowsEnvVars(anthropicEnvVars)
 	default:
 		fmt.Printf("⚠️  本系统不支持自动清除全局环境变量，请手动删除以下变量:\n")
-		for _, key := range projectEnvVars {
+		for _, key := range anthropicEnvVars {
 			fmt.Printf("   %s\n", key)
 		}
 		return nil

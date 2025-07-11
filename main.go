@@ -24,8 +24,8 @@ func init() {
 func main() {
 	var rootCmd = &cobra.Command{
 		Use:   "claudeproxy",
-		Short: "Claude Code Proxy - 将Claude API转换为OpenAI格式的代理服务",
-		Long: `Claude Code Proxy 是一个代理服务，可以将Claude API调用转换为OpenAI兼容的格式。
+		Short: "Claude Code Proxy - 将Claude API转换为胜算云格式的代理服务",
+		Long: `Claude Code Proxy 是一个代理服务，可以将Claude API调用转换为胜算云格式。
 它允许您在支持OpenAI API的应用程序中使用Claude模型。`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !configManager.ConfigExists() {
@@ -151,17 +151,14 @@ func main() {
 				}
 			}
 
-			// Clear environment variables from current session
-			projectEnvVars := []string{
-				"SSY_API_KEY", "BIG_MODEL_NAME", "SMALL_MODEL_NAME",
-				"BASE_URL", "REFERRER_URL", "APP_NAME", "APP_VERSION",
-				"HOST", "PORT", "RELOAD", "OPEN_CLAUDE_CACHE", "LOG_LEVEL",
-				"ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", // 添加ANTHROPIC相关环境变量
+			// Clear environment variables from current session (only ANTHROPIC ones)
+			anthropicEnvVars := []string{
+				"ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN",
 			}
 
-			fmt.Println("🧹 正在清除当前会话的环境变量...")
+			fmt.Println("🧹 正在清除当前会话的ANTHROPIC环境变量...")
 			clearedCount := 0
-			for _, key := range projectEnvVars {
+			for _, key := range anthropicEnvVars {
 				if value := os.Getenv(key); value != "" {
 					os.Unsetenv(key)
 					fmt.Printf("✅ 已清除当前会话变量: %s\n", key)
@@ -170,10 +167,10 @@ func main() {
 			}
 
 			if clearedCount == 0 {
-				fmt.Println("ℹ️  当前会话中没有发现项目相关的环境变量")
+				fmt.Println("ℹ️  当前会话中没有发现ANTHROPIC相关的环境变量")
 			}
 
-			// Clear all environment variables from config files
+			// Clear ANTHROPIC environment variables from config files
 			if err := configManager.ClearAllEnvVars(); err != nil {
 				cli.ShowError(fmt.Errorf("清除环境变量失败: %v", err))
 			}
@@ -188,10 +185,10 @@ func main() {
 			}
 
 			fmt.Println("\n✅ 清理完成！")
-			fmt.Println("💡 配置文件和shell配置文件中的环境变量已清除")
+			fmt.Println("💡 JSON配置文件和shell配置文件中的ANTHROPIC环境变量已清除")
 			fmt.Println("\n⚠️  注意: 当前终端会话的环境变量无法通过程序清除")
-			fmt.Println("如需清除当前会话的环境变量，请手动执行以下命令:")
-			for _, key := range projectEnvVars {
+			fmt.Println("如需清除当前会话的ANTHROPIC环境变量，请手动执行以下命令:")
+			for _, key := range anthropicEnvVars {
 				fmt.Printf("   unset %s\n", key)
 			}
 			fmt.Println("\n💡 建议重启终端以确保所有环境变量完全清除")
@@ -249,12 +246,7 @@ func runInitialSetup() {
 		cli.ShowError(fmt.Errorf("保存API密钥失败: %v", err))
 	}
 
-	// Update global environment variable if it's a new API key
-	if isNewAPIKey {
-		if err := configManager.UpdateGlobalEnvVar("SSY_API_KEY", apiKey); err != nil {
-			fmt.Printf("⚠️  更新全局环境变量失败: %v\n", err)
-		}
-	}
+	// Note: API key is now stored in JSON config, no need to update global env vars
 
 	// Fetch models
 	fmt.Println("\n🔄 获取可用模型列表...")
@@ -306,18 +298,7 @@ func runInitialSetup() {
 		cli.ShowError(fmt.Errorf("保存模型配置失败: %v", err))
 	}
 
-	// Update global environment variables for models if they are new
-	if isNewBigModel {
-		if err := configManager.UpdateGlobalEnvVar("BIG_MODEL_NAME", bigModel); err != nil {
-			fmt.Printf("⚠️  更新BIG_MODEL_NAME环境变量失败: %v\n", err)
-		}
-	}
-
-	if isNewSmallModel {
-		if err := configManager.UpdateGlobalEnvVar("SMALL_MODEL_NAME", smallModel); err != nil {
-			fmt.Printf("⚠️  更新SMALL_MODEL_NAME环境变量失败: %v\n", err)
-		}
-	}
+	// Note: Models are now stored in JSON config, no need to update global env vars
 
 	// Restart service if running and any configuration changed
 	if isNewAPIKey || isNewBigModel || isNewSmallModel {
@@ -372,11 +353,7 @@ func runSetConfig() {
 		if currentAPIKey != apiKey {
 			configChanges = map[string]string{"SSY_API_KEY": apiKey}
 			needRestart = true
-
-			// Update global environment variable
-			if err := configManager.UpdateGlobalEnvVar("SSY_API_KEY", apiKey); err != nil {
-				fmt.Printf("⚠️  更新全局环境变量失败: %v\n", err)
-			}
+			// Note: API key is now stored in JSON config
 		}
 
 		fmt.Println("✅ API密钥已更新")
@@ -422,21 +399,13 @@ func runSetConfig() {
 		if currentBigModel != bigModel {
 			configChanges["BIG_MODEL_NAME"] = bigModel
 			needRestart = true
-
-			// Update global environment variable
-			if err := configManager.UpdateGlobalEnvVar("BIG_MODEL_NAME", bigModel); err != nil {
-				fmt.Printf("⚠️  更新BIG_MODEL_NAME环境变量失败: %v\n", err)
-			}
+			// Note: Model is now stored in JSON config
 		}
 
 		if currentSmallModel != smallModel {
 			configChanges["SMALL_MODEL_NAME"] = smallModel
 			needRestart = true
-
-			// Update global environment variable
-			if err := configManager.UpdateGlobalEnvVar("SMALL_MODEL_NAME", smallModel); err != nil {
-				fmt.Printf("⚠️  更新SMALL_MODEL_NAME环境变量失败: %v\n", err)
-			}
+			// Note: Model is now stored in JSON config
 		}
 
 		fmt.Println("✅ 模型配置已更新")
