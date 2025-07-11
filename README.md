@@ -1,6 +1,6 @@
-# Claude Code Proxy
+# Claude Code Proxy SSY
 
-Claude Code Proxy 是一个命令行工具，可以将Claude API转换为OpenAI兼容的格式，让您在支持OpenAI API的应用程序中使用Claude模型。
+Claude Code Proxy SSY 是一个命令行工具，可以将Claude API转换为胜算云格式，让您在Claude的应用程序中使用胜算云全球模型API。
 
 ## ✨ 功能特性
 
@@ -13,18 +13,45 @@ Claude Code Proxy 是一个命令行工具，可以将Claude API转换为OpenAI�
 
 ## 📦 安装
 
-### 方式一: 下载预编译二进制文件
+### 方式一: 快速安装（推荐）
 
-1. 从 [Releases](https://github.com/your-repo/releases) 页面下载适合您操作系统的二进制文件
+**Linux/macOS:**
+```bash
+sudo curl -o /usr/local/bin/claudeproxy -L https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_$(uname -s)_$(uname -m)
+sudo chmod +x /usr/local/bin/claudeproxy
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_Windows_x86_64.exe" -OutFile "claudeproxy.exe"
+```
+
+### 方式二: 使用安装脚本
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SSYCloud/claude-code-proxy-ssy/main/install.sh | bash
+```
+
+### 方式三: 手动下载
+
+1. 从 [Releases](https://github.com/SSYCloud/claude-code-proxy-ssy/releases) 页面下载适合您操作系统的二进制文件
 2. 解压并将文件放到系统 PATH 中
 3. 运行 `claudeproxy setup` 进行初始化
 
-### 方式二: 从源码构建
+支持的平台：
+- **Linux x86_64**: claudeproxy_Linux_x86_64
+- **Linux ARM64**: claudeproxy_Linux_arm64
+- **macOS Intel**: claudeproxy_Darwin_x86_64
+- **macOS Apple Silicon**: claudeproxy_Darwin_arm64
+- **Windows x86_64**: claudeproxy_Windows_x86_64.exe
+- **Windows ARM64**: claudeproxy_Windows_arm64.exe
+
+### 方式四: 从源码构建
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-repo/claude-code-provider-proxy.git
-cd claude-code-provider-proxy
+git clone https://github.com/SSYCloud/claude-code-proxy-ssy.git
+cd claude-code-proxy-ssy
 
 # 构建当前平台
 make build

@@ -1,13 +1,34 @@
-# Python
+# Go
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+claudeproxy
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Go workspace file
+go.work
+
+# Build artifacts
+dist/
+release/
+build/
+*.tar.gz
+*.zip
+
+# Python (if any)
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 *.jsonl
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -34,6 +55,7 @@ ENV/
 *.swo
 .DS_Store
 CLAUDE.md
+
 # Testing
 .coverage
 htmlcov/
@@ -42,6 +64,8 @@ coverage/
 
 # Environment variables
 .env
+.env.local
+.env.production
 
 # Logs
 *.log
@@ -50,6 +74,42 @@ conversion_log.jsonl
 
 # Docker
 .dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+release-notes.md
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Linux
+*~
+
+# Backup files
+*.bak
+*.backup
+*.old
 
 # Misc
 .mypy_cache/
