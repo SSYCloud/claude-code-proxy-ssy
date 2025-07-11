@@ -20,19 +20,22 @@ Claude Code Proxy SSY 是一个命令行工具，可以将Claude API转换为胜
 sudo curl -o /usr/local/bin/claudeproxy -L https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_`uname -s`_`uname -m`
 sudo chmod +x /usr/local/bin/claudeproxy
 ```
+国内安装方式
+```bash
+sudo curl -o /usr/local/bin/claudeproxy -L https://shengsuanyun.oss-cn-shanghai.aliyuncs.com/claude-code-proxy-ssy/claudeproxy_`uname -s`_`uname -m`
+sudo chmod +x /usr/local/bin/claudeproxy
+```
 
 **Windows (PowerShell):**
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_Windows_x86_64.exe" -OutFile "claudeproxy.exe"
 ```
-
-### 方式二: 使用安装脚本
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/SSYCloud/claude-code-proxy-ssy/main/install.sh | bash
+国内安装方式
+```powershell
+Invoke-WebRequest -Uri "https://shengsuanyun.oss-cn-shanghai.aliyuncs.com/claude-code-proxy-ssy/claudeproxy_Windows_x86_64.exe" -OutFile "claudeproxy.exe"
 ```
 
-### 方式三: 手动下载
+### 方式二: 手动下载
 
 1. 从 [Releases](https://github.com/SSYCloud/claude-code-proxy-ssy/releases) 页面下载适合您操作系统的二进制文件
 2. 解压并将文件放到系统 PATH 中
