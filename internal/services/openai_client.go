@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"claude-code-provider-proxy/internal/config"
@@ -15,6 +16,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // OpenAIClient handles communication with OpenAI API
 type OpenAIClient struct {
 	config     *config.Config
@@ -22,24 +31,77 @@ type OpenAIClient struct {
 	logger     *logrus.Logger
 }
 
-// NewOpenAIClient creates a new OpenAI client
+// NewOpenAIClient creates a new OpenAI client with optimized timeout settings
 func NewOpenAIClient(cfg *config.Config, logger *logrus.Logger) *OpenAIClient {
+	// 优化网络超时设置，避免早期连接重置
 	return &OpenAIClient{
 		config: cfg,
 		httpClient: &http.Client{
-			Timeout: 180 * time.Second, // 3 minutes timeout like Python version
+			Timeout: 60 * time.Second, // 减少总体超时
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     30 * time.Second,
+				TLSHandshakeTimeout: 10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				DisableKeepAlives:   false, // 允许keep-alive提高效率
+			},
 		},
 		logger: logger,
 	}
 }
 
-// CreateChatCompletion sends a chat completion request to OpenAI
+// CreateChatCompletion sends a chat completion request to OpenAI with retry for EOF errors
 func (c *OpenAIClient) CreateChatCompletion(ctx context.Context, req *models.OpenAIRequest) (*models.OpenAIResponse, error) {
+	const maxRetries = 3
+	const retryDelay = 100 * time.Millisecond
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		result, err := c.createChatCompletionWithRetry(ctx, req, attempt)
+		if err != nil {
+			// 检查是否是EOF错误
+			if isEOFError(err) && attempt < maxRetries-1 {
+				c.logger.WithFields(logrus.Fields{
+					"attempt": attempt + 1,
+					"error":   err.Error(),
+				}).Warn("Retrying EOF error")
+				// 指数退避延迟
+				time.Sleep(retryDelay * time.Duration(1<<uint(attempt)))
+				continue
+			}
+			return nil, err
+		}
+		return result, nil
+	}
+	
+	return nil, fmt.Errorf("failed after %d retries: %w", maxRetries, fmt.Errorf("all retry attempts exhausted"))
+}
+
+// isEOFError checks if the error is an EOF or unexpected EOF error
+func isEOFError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "unexpected EOF") || strings.Contains(err.Error(), "EOF")
+}
+
+// createChatCompletionWithRetry is the actual implementation without retry logic
+func (c *OpenAIClient) createChatCompletionWithRetry(ctx context.Context, req *models.OpenAIRequest, attempt int) (*models.OpenAIResponse, error) {
 	// Prepare request body
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
+
+	// Debug log: detailed request info
+	c.logger.WithFields(logrus.Fields{
+		"url":     fmt.Sprintf("%s/chat/completions", c.config.OpenAIBaseURL),
+		"method":  "POST",
+		"headers": fmt.Sprintf("Content-Type=application/json, Authorization=Bearer %s...", c.config.OpenAIAPIKey[:min(len(c.config.OpenAIAPIKey), 10)]),
+		"body_length": len(reqBody),
+		"body_preview": string(reqBody[:min(len(reqBody), 200)]),
+		"attempt": attempt,
+	}).Info("Making API request")
 
 	// Create HTTP request
 	url := fmt.Sprintf("%s/chat/completions", c.config.OpenAIBaseURL)
@@ -61,15 +123,34 @@ func (c *OpenAIClient) CreateChatCompletion(ctx context.Context, req *models.Ope
 	// Make request
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("HTTP request failed")
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Debug log: response info
+	c.logger.WithFields(logrus.Fields{
+		"status_code": resp.StatusCode,
+		"headers":     fmt.Sprintf("%v", resp.Header),
+		"attempt":     attempt,
+	}).Info("HTTP response received")
+
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Failed to read response body")
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
+
+	// Debug log: response body
+	c.logger.WithFields(logrus.Fields{
+		"body_length": len(respBody),
+		"body":        string(respBody),
+	}).Debug("HTTP response body")
 
 	// Check for errors
 	if resp.StatusCode != http.StatusOK {
@@ -105,6 +186,14 @@ func (c *OpenAIClient) CreateStreamingChatCompletion(ctx context.Context, req *m
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	// Debug log: detailed streaming request info
+	c.logger.WithFields(logrus.Fields{
+		"url":     fmt.Sprintf("%s/chat/completions", c.config.OpenAIBaseURL),
+		"method":  "POST",
+		"headers": fmt.Sprintf("Content-Type=application/json, Accept=text/event-stream, Authorization=Bearer %s...", c.config.OpenAIAPIKey[:min(len(c.config.OpenAIAPIKey), 10)]),
+		"body":    string(reqBody),
+	}).Debug("HTTP streaming request details")
+
 	// Create HTTP request
 	url := fmt.Sprintf("%s/chat/completions", c.config.OpenAIBaseURL)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
@@ -127,15 +216,30 @@ func (c *OpenAIClient) CreateStreamingChatCompletion(ctx context.Context, req *m
 	// Make request
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("HTTP streaming request failed")
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
+
+	// Debug log: streaming response info
+	c.logger.WithFields(logrus.Fields{
+		"status_code": resp.StatusCode,
+		"headers":     fmt.Sprintf("%v", resp.Header),
+	}).Debug("HTTP streaming response received")
 
 	// Check for errors
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
 		respBody, _ := io.ReadAll(resp.Body)
+		c.logger.WithFields(logrus.Fields{
+			"status_code":    resp.StatusCode,
+			"error_response": string(respBody),
+		}).Error("HTTP streaming request error")
 		return nil, c.handleAPIError(resp.StatusCode, respBody)
 	}
+
+	c.logger.Debug("HTTP streaming connection established successfully")
 
 	return resp, nil
 }

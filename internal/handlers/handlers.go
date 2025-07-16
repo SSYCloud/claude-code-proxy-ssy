@@ -123,6 +123,17 @@ func (h *Handler) CreateMessage(c *gin.Context) {
 		"small_model":    h.config.SmallModelName,
 	}).Info("Model selection completed")
 
+	// Debug: configuration details
+	h.logger.WithFields(logrus.Fields{
+		"openai_base_url":   h.config.OpenAIBaseURL,
+		"app_name":          h.config.AppName,
+		"big_model":         h.config.BigModelName,
+		"small_model":       h.config.SmallModelName,
+		"open_claude_cache": h.config.OpenClaudeCache,
+		"original_model":    req.Model,
+		"selected_model":    openAIReq.Model,
+	}).Debug("Configuration and model selection details")
+
 	// Handle streaming vs non-streaming
 	if req.Stream {
 		h.handleStreamingRequest(c, openAIReq, req.Model)
@@ -136,20 +147,34 @@ func (h *Handler) handleStreamingRequest(c *gin.Context, openAIReq *models.OpenA
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
 	defer cancel()
 
+	h.logger.WithFields(logrus.Fields{
+		"original_model": originalModel,
+		"selected_model": openAIReq.Model,
+		"request_type":   "streaming",
+	}).Debug("Starting streaming request")
+
 	// Make streaming request to OpenAI
 	resp, err := h.openAIClient.CreateStreamingChatCompletion(ctx, openAIReq)
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to create streaming completion")
+		h.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("OpenAI streaming request failed")
 		h.streamingService.HandleStreamingError(c, err)
 		return
 	}
 
+	h.logger.Debug("OpenAI streaming connection established")
+
 	// Stream the response
 	if err := h.streamingService.StreamResponse(c, resp, originalModel); err != nil {
-		h.logger.WithError(err).Error("Failed to stream response")
+		h.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Streaming response failed")
 		h.streamingService.HandleStreamingError(c, err)
 		return
 	}
+
+	h.logger.Debug("Streaming request completed successfully")
 }
 
 // handleNonStreamingRequest handles non-streaming message requests
@@ -157,10 +182,18 @@ func (h *Handler) handleNonStreamingRequest(c *gin.Context, openAIReq *models.Op
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
 	defer cancel()
 
+	h.logger.WithFields(logrus.Fields{
+		"original_model": originalModel,
+		"selected_model": openAIReq.Model,
+		"request_type":   "non_streaming",
+	}).Debug("Starting non-streaming request")
+
 	// Make request to OpenAI
 	openAIResp, err := h.openAIClient.CreateChatCompletion(ctx, openAIReq)
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to create completion")
+		h.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("OpenAI request failed")
 		if apiErr, ok := err.(*models.APIError); ok {
 			c.JSON(apiErr.HTTPStatus(), models.ErrorResponse{Error: apiErr})
 		} else {
@@ -171,15 +204,21 @@ func (h *Handler) handleNonStreamingRequest(c *gin.Context, openAIReq *models.Op
 		return
 	}
 
+	h.logger.Debug("OpenAI request completed successfully")
+
 	// Convert response to Anthropic format
 	anthropicResp, err := h.conversionService.ConvertOpenAIToAnthropic(openAIResp, originalModel)
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to convert response")
+		h.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Response conversion failed")
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.NewInternalError("Failed to process response"),
 		})
 		return
 	}
+
+	h.logger.Debug("Response conversion completed successfully")
 
 	// Log the response
 	h.logger.WithFields(logrus.Fields{

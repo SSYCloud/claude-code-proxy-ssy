@@ -56,7 +56,7 @@ func New(cfg *config.Config) *Server {
 	// Create services
 	openAIClient := services.NewOpenAIClient(cfg, logger)
 	modelSelector := services.NewModelSelectorService(cfg, logger)
-	conversionService := services.NewConversionService(modelSelector, cfg)
+	conversionService := services.NewConversionService(modelSelector, cfg, logger)
 	tokenService := services.NewTokenCountingService()
 	streamingService := services.NewStreamingService(conversionService, logger)
 

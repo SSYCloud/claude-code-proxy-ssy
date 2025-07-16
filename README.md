@@ -14,6 +14,9 @@ Claude Code Proxy SSY 是一个命令行工具，可以将Claude API转换为胜
 ## 📦 安装
 
 ### 使用前提（安装Claude Code）
+注册 [胜算云](https://www.shengsuanyun.com) , 限时注册赠送免费额度
+
+### 使用前提（安装Claude Code）
 
 ```shell
 npm install -g @anthropic-ai/claude-code
@@ -80,7 +83,7 @@ claudeproxy setup
 - 引导您输入胜算云 API 密钥
 - 获取可用模型列表
 - 让您选择大模型和小模型
-- 保存配置到 `~/.claudeproxy/.env`
+- 保存配置到 `~/.claudeproxy/config.json`
 
 ### 2. 启动服务
 
@@ -151,7 +154,7 @@ claudeproxy clean
 
 ## ⚙️ 配置选项
 
-默认配置保存在 `~/.claudeproxy/.env` 文件中:
+默认配置保存在 `~/.claudeproxy/config.json` 文件中:
 
 ```bash
 BASE_URL=https://router.shengsuanyun.com/api/v1
@@ -169,6 +172,12 @@ SMALL_MODEL_NAME=selected-small-model
 ```
 
 您也可以通过环境变量覆盖这些设置。
+
+## ⚙️ 使用claude code
+
+```bash
+claude
+```
 
 ## 🔧 开发
 

@@ -85,12 +85,6 @@ jobs:
         name: Claude Code Proxy ${{ steps.version.outputs.VERSION }}
         body: |
           # Claude Code Proxy ${{ steps.version.outputs.VERSION }}
-          
-          ## 🎉 新特性
-          - 提供 OpenAI 兼容的 API 接口
-          - 支持 Claude 3.5 Sonnet 模型
-          - 支持流式响应
-          - 支持多种部署方式
 
           ## 🔧 配置说明
           

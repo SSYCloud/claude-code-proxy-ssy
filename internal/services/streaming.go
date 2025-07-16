@@ -94,19 +94,30 @@ func (s *StreamingService) StreamResponse(c *gin.Context, resp *http.Response, o
 
 			// Check for stream end
 			if data == "[DONE]" {
+				s.logger.Debug("Stream ended with [DONE]")
 				break
 			}
+
+			// Debug log: raw streaming data
+			s.logger.WithFields(logrus.Fields{
+				"data": data,
+			}).Debug("Streaming data received")
 
 			// Parse the JSON data
 			var openAIResp models.OpenAIStreamResponse
 			if err := json.Unmarshal([]byte(data), &openAIResp); err != nil {
-				s.logger.WithError(err).Warn("Failed to parse streaming response")
+				s.logger.WithFields(logrus.Fields{
+					"error": err.Error(),
+					"data":  data,
+				}).Warn("Failed to parse streaming response")
 				continue
 			}
 
 			// Process the chunk
 			if err := s.processStreamChunk(c, &openAIResp, originalModel); err != nil {
-				s.logger.WithError(err).Error("Failed to process stream chunk")
+				s.logger.WithFields(logrus.Fields{
+					"error": err.Error(),
+				}).Error("Failed to process stream chunk")
 				return err
 			}
 
@@ -116,6 +127,16 @@ func (s *StreamingService) StreamResponse(c *gin.Context, resp *http.Response, o
 			}
 		}
 	}
+
+	// Check for scanner errors
+	if err := scanner.Err(); err != nil {
+		s.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Scanner error during streaming")
+		return err
+	}
+
+	s.logger.Debug("Stream processing completed successfully")
 
 	// Send final events
 	if err := s.sendStreamEnd(c); err != nil {

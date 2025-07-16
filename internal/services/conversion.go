@@ -9,19 +9,23 @@ import (
 
 	"claude-code-provider-proxy/internal/config"
 	"claude-code-provider-proxy/internal/models"
+
+	"github.com/sirupsen/logrus"
 )
 
 // ConversionService handles conversion between Anthropic and OpenAI formats
 type ConversionService struct {
 	modelSelector *ModelSelectorService
 	config        *config.Config
+	logger        *logrus.Logger
 }
 
 // NewConversionService creates a new conversion service
-func NewConversionService(modelSelector *ModelSelectorService, cfg *config.Config) *ConversionService {
+func NewConversionService(modelSelector *ModelSelectorService, cfg *config.Config, logger *logrus.Logger) *ConversionService {
 	return &ConversionService{
 		modelSelector: modelSelector,
 		config:        cfg,
+		logger:        logger,
 	}
 }
 
@@ -32,11 +36,28 @@ func (s *ConversionService) isClaudeModel(targetModelName string) bool {
 
 // ConvertAnthropicToOpenAI converts an Anthropic request to OpenAI format
 func (s *ConversionService) ConvertAnthropicToOpenAI(req *models.AnthropicRequest, fallbackModel string) (*models.OpenAIRequest, error) {
+	// Debug log: original Anthropic request
+	if reqBytes, err := json.MarshalIndent(req, "", "  "); err == nil {
+		s.logger.WithFields(logrus.Fields{
+			"original_request": string(reqBytes),
+		}).Debug("Original Anthropic request")
+	} else {
+		s.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Failed to marshal original request")
+	}
+
 	// Use model selector to choose the appropriate model
 	selectedModel := fallbackModel
 	if s.modelSelector != nil {
 		selectedModel = s.modelSelector.SelectModel(req.Model, req)
 	}
+
+	s.logger.WithFields(logrus.Fields{
+		"selected_model": selectedModel,
+		"original_model": req.Model,
+		"fallback_model": fallbackModel,
+	}).Debug("Model selection completed")
 
 	openAIReq := &models.OpenAIRequest{
 		Model:       selectedModel,
@@ -74,6 +95,17 @@ func (s *ConversionService) ConvertAnthropicToOpenAI(req *models.AnthropicReques
 			}
 			openAIReq.ToolChoice = toolChoice
 		}
+	}
+
+	// Debug log: converted OpenAI request
+	if openAIBytes, err := json.MarshalIndent(openAIReq, "", "  "); err == nil {
+		s.logger.WithFields(logrus.Fields{
+			"converted_request": string(openAIBytes),
+		}).Debug("Converted OpenAI request")
+	} else {
+		s.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Failed to marshal converted request")
 	}
 
 	return openAIReq, nil
@@ -581,6 +613,17 @@ func (s *ConversionService) convertToolChoice(choice *models.AnthropicToolChoice
 
 // ConvertOpenAIToAnthropic converts OpenAI response to Anthropic format
 func (s *ConversionService) ConvertOpenAIToAnthropic(resp *models.OpenAIResponse, originalModel string) (*models.AnthropicResponse, error) {
+	// Debug log: original OpenAI response
+	if respBytes, err := json.MarshalIndent(resp, "", "  "); err == nil {
+		s.logger.WithFields(logrus.Fields{
+			"original_response": string(respBytes),
+		}).Debug("Original OpenAI response")
+	} else {
+		s.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Failed to marshal original response")
+	}
+
 	if len(resp.Choices) == 0 {
 		return nil, fmt.Errorf("no choices in OpenAI response")
 	}
@@ -605,6 +648,17 @@ func (s *ConversionService) ConvertOpenAIToAnthropic(resp *models.OpenAIResponse
 		return nil, err
 	}
 	anthropicResp.Content = content
+
+	// Debug log: converted Anthropic response
+	if anthropicBytes, err := json.MarshalIndent(anthropicResp, "", "  "); err == nil {
+		s.logger.WithFields(logrus.Fields{
+			"converted_response": string(anthropicBytes),
+		}).Debug("Converted Anthropic response")
+	} else {
+		s.logger.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("Failed to marshal converted response")
+	}
 
 	return anthropicResp, nil
 }
