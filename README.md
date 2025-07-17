@@ -91,16 +91,16 @@ claudeproxy setup
 claudeproxy start
 ```
 
-服务将在后台启动，默认监听 `http://127.0.0.1:3180`
+服务将在后台启动，默认监听 `http://0.0.0.0:3180`
 
 **自动配置 Claude 环境变量**: 服务启动成功后，会自动设置以下环境变量，方便Claude Desktop等应用直接使用：
 
-- `ANTHROPIC_BASE_URL=http://127.0.0.1:3180` (或您配置的HOST:PORT)
+- `ANTHROPIC_BASE_URL=http://0.0.0.0:3180` (或您配置的HOST:PORT)
 - `ANTHROPIC_AUTH_TOKEN=claudeproxy`
 
 ### 3. 使用服务
 
-现在您可以将任何支持 OpenAI API 的应用程序配置为使用 `http://127.0.0.1:3180` 作为 API 端点。
+现在您可以将任何支持 OpenAI API 的应用程序配置为使用 `http://0.0.0.0:3180` 作为 API 端点。
 
 对于Claude Desktop等原生支持Anthropic API的应用，环境变量已自动配置，无需额外设置。
 
@@ -156,19 +156,21 @@ claudeproxy clean
 
 默认配置保存在 `~/.claudeproxy/config.json` 文件中:
 
-```bash
-BASE_URL=https://router.shengsuanyun.com/api/v1
-REFERRER_URL=https://www.shengsuanyun.com
-APP_NAME=ClaudeCodeProxy
-APP_VERSION=1.0.0
-HOST=127.0.0.1
-PORT=3180
-RELOAD=true
-OPEN_CLAUDE_CACHE=true
-LOG_LEVEL=INFO
-SSY_API_KEY=your-api-key
-BIG_MODEL_NAME=selected-big-model
-SMALL_MODEL_NAME=selected-small-model
+```json
+{
+  "ssy_api_key": "**********",
+  "big_model_name": "****",
+  "small_model_name": "****",
+  "base_url": "https://router.shengsuanyun.com/api/v1",
+  "referrer_url": "https://www.shengsuanyun.com",
+  "app_name": "ClaudeCodeProxy",
+  "app_version": "0.1.3",
+  "host": "0.0.0.0",
+  "port": "3180",
+  "reload": "true",
+  "open_claude_cache": "true",
+  "log_level": "INFO"
+}
 ```
 
 您也可以通过环境变量覆盖这些设置。
@@ -178,6 +180,21 @@ SMALL_MODEL_NAME=selected-small-model
 ```bash
 claude
 ```
+
+## ❌ 问题排查
+
+### 日志排查
+
+```bash
+claudeproxy log -l 100
+```
+查看是否有 `/v1/messages` 请求
+
+如果没有请排查本地网络问题：
+1. 是否设置全局 HTTP_PROXY
+2. 是否有本地安全软件阻止3180端口访问
+   
+如果有 `/v1/messages` 请求，但是有报错，请提交  [Issues](https://github.com/your-repo/issues) 
 
 ## 🔧 开发
 
