@@ -265,3 +265,90 @@ func (sm *ServiceManager) printExportCommands(baseURL string) {
 		}
 	}
 }
+
+// RunClaudeCode runs Claude Code with proxy environment variables unset
+func (sm *ServiceManager) RunClaudeCode(args []string) error {
+	// Make sure server is running
+	if !sm.IsRunning() {
+		return fmt.Errorf("服务未运行，请先运行 'claudeproxy start'")
+	}
+
+	// Ensure Claude Code is installed
+	var claudePath string
+	var err error
+
+	// Windows may have .cmd or .exe extensions for the claude command
+	if runtime.GOOS == "windows" {
+		// 在Windows中，可能需要检查多个可能的可执行文件名
+		possibleNames := []string{"claude.cmd", "claude.exe", "claude.bat", "claude"}
+		for _, name := range possibleNames {
+			claudePath, err = exec.LookPath(name)
+			if err == nil {
+				break // 找到了可执行文件
+			}
+		}
+		if claudePath == "" {
+			return fmt.Errorf("找不到 claude 命令，请先安装 Claude Code: npm install -g @anthropic-ai/claude-code")
+		}
+	} else {
+		claudePath, err = exec.LookPath("claude")
+		if err != nil {
+			return fmt.Errorf("找不到 claude 命令，请先安装 Claude Code: npm install -g @anthropic-ai/claude-code")
+		}
+	}
+
+	// Create a new command to run Claude Code
+	cmd := exec.Command(claudePath, args...)
+
+	// Copy the current environment variables
+	env := os.Environ()
+
+	// Filter out proxy environment variables
+	filteredEnv := []string{}
+
+	// Windows 环境变量名不区分大小写，需要处理各种大小写形式
+	proxyVars := []string{"http_proxy", "https_proxy", "all_proxy"}
+	if runtime.GOOS == "windows" {
+		// Windows中添加更多可能的大小写变体
+		proxyVars = append(proxyVars, "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY")
+	}
+
+	for _, e := range env {
+		shouldKeep := true
+
+		// 检查是否是代理环境变量
+		for _, proxyVar := range proxyVars {
+			if strings.HasPrefix(strings.ToLower(e), strings.ToLower(proxyVar)+"=") {
+				shouldKeep = false
+				break
+			}
+		}
+
+		if shouldKeep {
+			filteredEnv = append(filteredEnv, e)
+		}
+	}
+
+	// Add NO_PROXY environment variables
+	if runtime.GOOS == "windows" {
+		filteredEnv = append(filteredEnv, "NO_PROXY=localhost,127.0.0.1,0.0.0.0,::1")
+		// Windows 通常也需要大写形式
+		filteredEnv = append(filteredEnv, "no_proxy=localhost,127.0.0.1,0.0.0.0,::1")
+	} else {
+		filteredEnv = append(filteredEnv, "NO_PROXY=localhost,127.0.0.1,0.0.0.0,::1")
+		filteredEnv = append(filteredEnv, "no_proxy=localhost,127.0.0.1,0.0.0.0,::1")
+	}
+
+	// Set the environment variables for the command
+	cmd.Env = filteredEnv
+
+	// Connect the command's stdin, stdout, and stderr to the user's terminal
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("🚀 正在启动 Claude Code (已禁用代理设置)...\n")
+
+	// Run the command and wait for it to complete
+	return cmd.Run()
+}

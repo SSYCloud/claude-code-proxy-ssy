@@ -254,6 +254,24 @@ func main() {
 	rootCmd.AddCommand(logCmd)
 	rootCmd.AddCommand(serverCmd)
 
+	// Code command - runs Claude Code with proxy settings disabled
+	var codeCmd = &cobra.Command{
+		Use:   "code",
+		Short: "运行 Claude Code (无代理模式)",
+		Long:  "运行 Claude Code，自动禁用代理设置，解决本地代理冲突问题",
+		Run: func(cmd *cobra.Command, args []string) {
+			if !configManager.ConfigExists() {
+				fmt.Println("❌ 配置文件不存在，请先运行 'claudeproxy setup'")
+				os.Exit(1)
+			}
+
+			if err := serviceManager.RunClaudeCode(args); err != nil {
+				cli.ShowError(err)
+			}
+		},
+	}
+	rootCmd.AddCommand(codeCmd)
+
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
 		cli.ShowError(err)
@@ -469,7 +487,7 @@ func runSetConfig() {
 			if serviceManager.IsRunning() {
 				fmt.Println("正在停止服务...")
 				if err := serviceManager.Stop(); err != nil {
-					fmt.Printf("⚠️  停止服务失败: %v\n", err)
+					fmt.Printf("⚠️  停止服务失败: %v", err)
 				}
 			}
 

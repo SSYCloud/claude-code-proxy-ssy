@@ -146,6 +146,9 @@ claudeproxy set
 
 # 清除所有环境变量和配置
 claudeproxy clean
+
+# 无代理模式运行 Claude Code
+claudeproxy code
 ```
 
 ### 配置修改
@@ -213,36 +216,92 @@ claude
 
 运行 `claudeproxy setup` 重新初始化配置。
 
-### 网络问题排查
+### 全局代理冲突问题
+
+如果你设置了全局HTTP代理（如在 `~/.zshrc` 或 `~/.bashrc` 中设置了 `http_proxy`, `https_proxy`, `all_proxy` 等），Claude Code 可能会通过代理尝试访问本地服务器，导致连接失败。
+
+**推荐解决方法：**
+
+- **使用内置无代理命令** (最简单)
+
+   直接使用内置的无代理模式命令启动 Claude Code：
+   
+   ```bash
+   # macOS/Linux:
+   claudeproxy code
+   
+   # Windows:
+   claudeproxy.exe code
+   ```
+   
+   此命令会自动禁用代理设置并启动 Claude Code，无需额外配置。支持所有平台（Windows, macOS, Linux）。
+
+**其他解决方法：创建专用启动脚本***
+
+   
+   创建一个不使用代理的启动脚本 `run_claude.sh`：
+   
+   ```bash
+   #!/bin/bash
+   
+   # 临时取消代理设置
+   unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
+   
+   # 确保设置NO_PROXY
+   export NO_PROXY="localhost,127.0.0.1,0.0.0.0"
+   export no_proxy="localhost,127.0.0.1,0.0.0.0"
+   
+   # 运行Claude Code
+   claude "$@"
+   ```
+   
+   添加执行权限并使用：
+   
+   ```bash
+   chmod +x run_claude.sh
+   ./run_claude.sh
+   ```
+
+
+### 网络问题排查（Windows电脑常见异常）
 
 1. 在新终端测试不同的访问地址
 
-```bash
-curl -v http://127.0.0.1:3180/health
-curl -v http://localhost:3180/health  
-curl -v http://0.0.0.0:3180/health
-```
+    ```bash
+    curl -v http://127.0.0.1:3180/health
+    curl -v http://localhost:3180/health  
+    curl -v http://0.0.0.0:3180/health
+    ```
 
 2. 选择可以访问通的Host，并手动修改`~/.claudeproxy/config.json` 文件中的
 
-```json
-"host": "能访问通的Host",
-```
+    ```json
+    "host": "能访问通的Host",
+    ```
 
-3. stop停止服务，重新执行start命令，开启新的终端使用claude
+3. 停止服务后重新启动
+
+    ```bash
+    claudeproxy stop
+    claudeproxy start
+    ```
+
+4. 开启新的终端使用claude
 
 ### 日志排查
 
 ```bash
 claudeproxy log -l 100
 ```
+
 查看是否有 `/v1/messages` 请求
 
 如果没有请排查本地网络问题：
+
 1. 是否设置全局 HTTP_PROXY
 2. 是否有本地安全软件阻止3180端口访问
    
-如果有 `/v1/messages` 请求，但是有报错，请提交  [Issues](https://github.com/your-repo/issues) 
+如果有 `/v1/messages` 请求，但是有报错，请提交 [Issues](https://github.com/SSYCloud/claude-code-proxy-ssy/issues)
 
 
 ## 🔧 开发
