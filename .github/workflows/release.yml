@@ -85,7 +85,11 @@ jobs:
         name: Claude Code Proxy ${{ steps.version.outputs.VERSION }}
         body: |
           # Claude Code Proxy ${{ steps.version.outputs.VERSION }}
-
+          
+          ## 🎉 新特性
+          - 提供code命令执行Claude Code
+          - 支持无代理模式启动
+          
           ## 🔧 配置说明
           
           详细配置说明请参考项目文档。

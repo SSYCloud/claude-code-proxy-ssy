@@ -103,7 +103,7 @@ func (jcm *JSONConfigManager) SetDefaults() error {
 		BaseURL:         "https://router.shengsuanyun.com/api/v1",
 		ReferrerURL:     "https://www.shengsuanyun.com",
 		AppName:         "ClaudeCodeProxy",
-		AppVersion:      "0.1.3",
+		AppVersion:      "0.1.4",
 		Host:            "0.0.0.0",
 		Port:            "3180",
 		Reload:          "true",

@@ -181,7 +181,7 @@ claudeproxy code
   "base_url": "https://router.shengsuanyun.com/api/v1",
   "referrer_url": "https://www.shengsuanyun.com",
   "app_name": "ClaudeCodeProxy",
-  "app_version": "0.1.3",
+  "app_version": "0.1.4",
   "host": "0.0.0.0",
   "port": "3180",
   "reload": "true",
