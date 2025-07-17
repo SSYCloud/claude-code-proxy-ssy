@@ -42,6 +42,18 @@ sudo curl -o /usr/local/bin/claudeproxy -L https://shengsuanyun.oss-cn-shanghai.
 sudo chmod +x /usr/local/bin/claudeproxy
 ```
 
+**Windows:**
+
+```bash
+Invoke-WebRequest -Uri "https://github.com/SSYCloud/claude-code-proxy-ssy/releases/latest/download/claudeproxy_Windows_x86_64.exe" -OutFile "claudeproxy.exe"
+```
+
+国内安装方式：
+
+```bash
+Invoke-WebRequest -Uri "https://shengsuanyun.oss-cn-shanghai.aliyuncs.com/claude-code-proxy-ssy/claudeproxy_Windows_x86_64.exe" -OutFile "claudeproxy.exe"
+```
+
 ### 方式二: 手动下载
 
 1. 从 [Releases](https://github.com/SSYCloud/claude-code-proxy-ssy/releases) 页面下载适合您操作系统的二进制文件
@@ -53,6 +65,8 @@ sudo chmod +x /usr/local/bin/claudeproxy
 - **Linux ARM64**: claudeproxy_Linux_arm64
 - **macOS Intel**: claudeproxy_Darwin_x86_64
 - **macOS Apple Silicon**: claudeproxy_Darwin_arm64
+- **Windows x86_64**: claudeproxy_Windows_x86_64.exe
+- **Windows ARM64**: claudeproxy_Windows_arm64.exe
 
 ### 方式四: 从源码构建
 
@@ -181,7 +195,41 @@ claudeproxy clean
 claude
 ```
 
-## ❌ 问题排查
+## 🐛 故障排除
+
+### 服务无法启动
+
+1. 检查端口 3180 是否被占用
+2. 确保 API 密钥有效
+3. 查看配置是否正确: `claudeproxy config`
+
+### 模型列表获取失败
+
+1. 检查网络连接
+2. 验证 API 密钥是否有效
+3. 确保能访问 `https://router.shengsuanyun.com`
+
+### 配置文件丢失
+
+运行 `claudeproxy setup` 重新初始化配置。
+
+### 网络问题排查
+
+1. 在新终端测试不同的访问地址
+
+```bash
+curl -v http://127.0.0.1:3180/health
+curl -v http://localhost:3180/health  
+curl -v http://0.0.0.0:3180/health
+```
+
+2. 选择可以访问通的Host，并手动修改`~/.claudeproxy/config.json` 文件中的
+
+```json
+"host": "能访问通的Host",
+```
+
+3. stop停止服务，重新执行start命令，开启新的终端使用claude
 
 ### 日志排查
 
@@ -195,6 +243,7 @@ claudeproxy log -l 100
 2. 是否有本地安全软件阻止3180端口访问
    
 如果有 `/v1/messages` 请求，但是有报错，请提交  [Issues](https://github.com/your-repo/issues) 
+
 
 ## 🔧 开发
 
@@ -239,24 +288,6 @@ make build-all
 ├── Makefile           # Make 构建文件
 └── main.go            # 主程序
 ```
-
-## 🐛 故障排除
-
-### 服务无法启动
-
-1. 检查端口 3180 是否被占用
-2. 确保 API 密钥有效
-3. 查看配置是否正确: `claudeproxy config`
-
-### 模型列表获取失败
-
-1. 检查网络连接
-2. 验证 API 密钥是否有效
-3. 确保能访问 `https://router.shengsuanyun.com`
-
-### 配置文件丢失
-
-运行 `claudeproxy setup` 重新初始化配置。
 
 ## 📄 许可证
 
