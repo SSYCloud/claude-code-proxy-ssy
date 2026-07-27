@@ -1,6 +1,10 @@
 # Claude Code Proxy SSY
 
-Claude Code Proxy SSY 是一个命令行工具，可以将Claude API转换为胜算云格式，让您在Claude的应用程序中使用胜算云全球模型API。
+![License](https://img.shields.io/github/license/SSYCloud/claude-code-proxy-ssy) ![Release](https://img.shields.io/github/v/release/SSYCloud/claude-code-proxy-ssy)  ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)  ![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)
+
+
+本项目（Claude Code Proxy SSY）是一个命令行工具，可以将Claude API转换为胜算云格式，让您在Claude的应用程序中使用胜算云全球模型API。
+
 
 ## ✨ 功能特性
 
@@ -13,10 +17,9 @@ Claude Code Proxy SSY 是一个命令行工具，可以将Claude API转换为胜
 
 ## 📦 安装
 
-### 使用前提（安装Claude Code）
-注册 [胜算云](https://www.shengsuanyun.com) , 限时注册赠送免费额度
-
-### 使用前提（安装Claude Code）
+### 前置条件
+1. 注册 [胜算云](https://www.shengsuanyun.com) , 限时注册赠送免费额度
+2. 安装Claude Code
 
 ```shell
 npm install -g @anthropic-ai/claude-code
@@ -68,7 +71,7 @@ Invoke-WebRequest -Uri "https://shengsuanyun.oss-cn-shanghai.aliyuncs.com/claude
 - **Windows x86_64**: claudeproxy_Windows_x86_64.exe
 - **Windows ARM64**: claudeproxy_Windows_arm64.exe
 
-### 方式四: 从源码构建
+### 方式三: 从源码构建
 
 ```bash
 # 克隆仓库
@@ -120,7 +123,7 @@ claudeproxy start
 
 ## 📋 命令使用
 
-### 基本命令
+### 1. 基本命令
 
 ```bash
 # 查看帮助
@@ -151,7 +154,7 @@ claudeproxy clean
 claudeproxy code
 ```
 
-### 配置修改
+### 2. 配置修改
 
 使用 `claudeproxy set` 命令可以:
 
@@ -160,7 +163,7 @@ claudeproxy code
 - 查看当前配置
 - 重新初始化配置
 
-### 清理配置
+### 3. 清理配置
 
 使用 `claudeproxy clean` 命令可以完全清除所有项目相关的配置：
 
@@ -200,23 +203,23 @@ claude
 
 ## 🐛 故障排除
 
-### 服务无法启动
+### 1. 服务无法启动
 
 1. 检查端口 3180 是否被占用
 2. 确保 API 密钥有效
 3. 查看配置是否正确: `claudeproxy config`
 
-### 模型列表获取失败
+### 2. 模型列表获取失败
 
 1. 检查网络连接
 2. 验证 API 密钥是否有效
 3. 确保能访问 `https://router.shengsuanyun.com`
 
-### 配置文件丢失
+### 3. 配置文件丢失
 
 运行 `claudeproxy setup` 重新初始化配置。
 
-### 全局代理冲突问题
+### 4. 全局代理冲突问题
 
 如果你设置了全局HTTP代理（如在 `~/.zshrc` 或 `~/.bashrc` 中设置了 `http_proxy`, `https_proxy`, `all_proxy` 等），Claude Code 可能会通过代理尝试访问本地服务器，导致连接失败。
 
@@ -263,55 +266,52 @@ claude
    ```
 
 
-### 网络问题排查（Windows电脑常见异常）
+### 5. 网络问题排查（Windows电脑常见异常）
 
-1. 在新终端测试不同的访问地址
+- 在新终端测试不同的访问地址
 
     ```bash
     curl -v http://127.0.0.1:3180/health
     curl -v http://localhost:3180/health  
     curl -v http://0.0.0.0:3180/health
     ```
-
-2. 选择可以访问通的Host，并手动修改`~/.claudeproxy/config.json` 文件中的
+- 选择可以访问通的Host，并手动修改`~/.claudeproxy/config.json` 文件中的
 
     ```json
     "host": "能访问通的Host",
     ```
 
-3. 停止服务后重新启动
+- 停止服务后重新启动
 
     ```bash
     claudeproxy stop
     claudeproxy start
     ```
 
-4. 开启新的终端使用claude
+- 开启新的终端使用claude
 
-### 日志排查
+### 6. 日志排查
 
 ```bash
 claudeproxy log -l 100
 ```
 
-查看是否有 `/v1/messages` 请求
+查看是否有 `/v1/messages` 请求，如果没有请排查本地网络问题：
 
-如果没有请排查本地网络问题：
-
-1. 是否设置全局 HTTP_PROXY
-2. 是否有本地安全软件阻止3180端口访问
+- 是否设置全局 HTTP_PROXY
+- 是否有本地安全软件阻止3180端口访问
    
 如果有 `/v1/messages` 请求，但是有报错，请提交 [Issues](https://github.com/SSYCloud/claude-code-proxy-ssy/issues)
 
 
 ## 🔧 开发
 
-### 前置要求
+### 1. 前置要求
 
 - Go 1.21 或更高版本
 - Make (可选)
 
-### 开发命令
+### 2. 开发命令
 
 ```bash
 # 运行开发版本
@@ -330,7 +330,7 @@ make lint
 make build-all
 ```
 
-### 项目结构
+### 3. 项目结构
 
 ```
 ├── cmd/cli/            # CLI 应用程序
