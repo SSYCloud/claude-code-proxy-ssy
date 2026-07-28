@@ -348,6 +348,17 @@ make build-all
 └── main.go            # 主程序
 ```
 
+## 💡 加入开发者交流群
+- 第一时间获取版本更新
+- 获取使用教程和最佳实践
+- 与开发团队直接交流
+- 反馈 Bug 和提出功能建议
+- 了解胜算云最新 AI 产品
+<p align="center">
+  <img src="http://pinfans-tec.oss-cn-shanghai.aliyuncs.com/lean/20260728-100815.png" width="320" alt="开发者交流群">
+</p>
+
+
 ## 📄 许可证
 
 本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
