@@ -10,6 +10,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"net"
+	"net/http"
+	"net/url"
 )
 
 // ServiceManager handles server lifecycle
@@ -181,6 +184,29 @@ func (sm *ServiceManager) IsRunning() bool {
 	return true
 }
 
+func (sm *ServiceManager) IsProxyHealth() bool {
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+	host := sm.configManager.GetConfig("HOST")
+	port := sm.configManager.GetConfig("PORT")
+	u := &url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(host, port),
+		Path:   "/health",
+	}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return false
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close() 
+	return resp.StatusCode == http.StatusOK
+}
+
 // savePID saves the process ID to file
 func (sm *ServiceManager) savePID(pid int) error {
 	return os.WriteFile(sm.pidFile, []byte(strconv.Itoa(pid)), 0644)
@@ -269,10 +295,12 @@ func (sm *ServiceManager) printExportCommands(baseURL string) {
 // RunClaudeCode runs Claude Code with proxy environment variables unset
 func (sm *ServiceManager) RunClaudeCode(args []string) error {
 	// Make sure server is running
-	if !sm.IsRunning() {
+	// if !sm.IsRunning() {
+	// 	return fmt.Errorf("服务未运行，请先运行 'claudeproxy start'")
+	// }
+	if !sm.IsProxyHealth() {
 		return fmt.Errorf("服务未运行，请先运行 'claudeproxy start'")
 	}
-
 	// Ensure Claude Code is installed
 	var claudePath string
 	var err error
